@@ -25,6 +25,10 @@ def parse_args():
     p.add_argument('--batch',type=int,default=None)
     p.add_argument('--eval-samples',type=int,default=None)
     p.add_argument('--device',choices=['cpu','cuda','auto'],default='auto')
+    p.add_argument('--early-stopping-patience',type=int,default=None,
+                   help='Optional number of validation checks without improvement')
+    p.add_argument('--val-every',type=int,default=10)
+    p.add_argument('--min-delta',type=float,default=0.)
     p.add_argument('--lambda-values',type=float,nargs='*',default=None,
                    help='Explicit lambdas; otherwise derived from measured baseline J_E/J_U')
     p.add_argument('--inference-sizes',type=int,nargs='*',default=[100,1000])
@@ -68,11 +72,17 @@ def execute(args):
                     folder=root/tag;folder.mkdir()
                     result=train(system,graph,lam=lam,activation=activation,epochs=cfg.epochs,
                         horizon=cfg.horizon,batch=cfg.batch,val_batch=max(64,cfg.batch),
-                        lr=cfg.lr,eta=cfg.eta,seed=cfg.seed+11,device=cfg.device)
+                        lr=cfg.lr,eta=cfg.eta,seed=cfg.seed+11,device=cfg.device,
+                        val_every=args.val_every,
+                        early_stopping_patience=args.early_stopping_patience,
+                        min_delta=args.min_delta)
                     W=result['W']
                     write_csv(folder/'training_history.csv',result['history'])
                     save_training_plot(folder/'training',result['history'],f'N={n_train}, {activation}, lambda={lam:.4g}')
                     save_checkpoint(folder/'checkpoint.npz',system,graph,W,activation,lam)
+                    save_checkpoint(folder/'final_checkpoint.npz',system,graph,W,activation,lam)
+                    save_checkpoint(folder/'best_validation_checkpoint.npz',system,graph,
+                                    result['best_W'],activation,lam)
                     local=evaluate_pair(system,graph,W,cfg.horizon,cfg.eval_samples,
                                         seed=cfg.seed+801,activation=activation)
                     write_csv(folder/'paired_small.csv',local['records'])
@@ -81,7 +91,10 @@ def execute(args):
                     save_curve_plot(folder/'disagreement_small',local['curves'],f'N={n_train}; {tag}')
                     save_curve_csv(folder/'disagreement_small.csv',local['curves'])
                     summary={'tag':tag,'N_train':n_train,'activation':activation,'lambda':lam,
-                             'training_seed':result['seed'],'W':W,'gamma_train':gain.gamma,
+                             'training_seed':result['seed'],'W':W,
+                             'best_validation_epoch':result['best_epoch'],
+                             'best_validation_objective':result['best_validation_objective'],
+                             'stopped_early':result['stopped_early'],'gamma_train':gain.gamma,
                              'omega_peak':gain.omega_peak,'gamma0':gain.gamma0,
                              'matching_residual':matching_residual(system),'cap':result['cap'],
                              'norm':float(np.linalg.norm(W,2)),'train_baseline_J_E':je0,

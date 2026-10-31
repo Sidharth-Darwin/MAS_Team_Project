@@ -5,7 +5,7 @@ import torch
 from .controllers import correction_numpy, activate
 
 
-def step_numpy(states, system, graph, W=None, activation='identity'):
+def step_numpy(states, system, graph, W=None, activation='identity', disturbance=None):
     """One PHYSICAL step. states:(N,2); W:(2,1) or None for baseline.
 
     Returns dict: states, disagreement (both before action), local, correction,
@@ -18,18 +18,28 @@ def step_numpy(states, system, graph, W=None, activation='identity'):
     local = np.einsum('nij,nj->ni',system.K,x)
     corr = np.zeros_like(local) if W is None else correction_numpy(e,W,activation)
     total = local + corr
-    next_states = np.einsum('nij,nj->ni',system.A,x) + np.einsum('nij,nj->ni',system.B,total)
+    # External actuator-channel perturbation only at inference. Report commanded
+    # physical energy using 'total', never add disturbance to the training objective.
+    d = np.zeros_like(total) if disturbance is None else np.asarray(disturbance,np.float64)
+    if d.shape != total.shape or not np.isfinite(d).all():
+        raise ValueError('disturbance must be finite shape (N,1)')
+    next_states = np.einsum('nij,nj->ni',system.A,x) + np.einsum('nij,nj->ni',system.B,total+d)
     return dict(states=x.copy(), disagreement=e, local=local, correction=corr,
                 total=total, next_states=next_states)
 
 
-def rollout_numpy(initial, system, graph, W=None, activation='identity', horizon=100):
+def rollout_numpy(initial, system, graph, W=None, activation='identity', horizon=100, disturbances=None):
     """Return full histories with X,E length T+1 and actions length T."""
     if horizon < 1: raise ValueError('T>=1')
     x = np.asarray(initial,np.float64).copy()
+    if disturbances is not None:
+        disturbances=np.asarray(disturbances,np.float64)
+        if disturbances.shape != (horizon,system.n,1) or not np.isfinite(disturbances).all():
+            raise ValueError('disturbances must be finite shape (T,N,1)')
     xx, ee, ll, vv, uu = [x.copy()], [graph.error(x)], [], [], []
-    for _ in range(horizon):
-        step = step_numpy(x,system,graph,W,activation)
+    for k in range(horizon):
+        step = step_numpy(x,system,graph,W,activation,
+                          None if disturbances is None else disturbances[k])
         ll.append(step['local']); vv.append(step['correction']); uu.append(step['total'])
         x = step['next_states']
         xx.append(x.copy()); ee.append(graph.error(x))

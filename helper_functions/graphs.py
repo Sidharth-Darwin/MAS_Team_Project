@@ -61,14 +61,20 @@ def from_edges(n, rows, cols, weights=None):
     return Graph(sparse.coo_matrix((data, (rows, cols)), shape=(n,n)).tocsr())
 
 
-def make_graph(n, topology='path', seed=0, neighborhood=8):
-    """Deterministic connected undirected path, ring, wide_ring, or random tree-plus-edges."""
+def make_graph(n, topology='path', seed=0, neighborhood=8, hub=0):
+    """Connected undirected star, chain/path, ring, wide_ring, complete, random graphs."""
     if n < 2: raise ValueError('N>=2 required')
     pairs = set()
     def add(i,j):
         if i != j: pairs.add((min(i,j), max(i,j)))
-    if topology == 'path':
+    if topology in ('path', 'chain'):
         for i in range(n-1): add(i,i+1)
+    elif topology == 'star':
+        if not 0<=hub<n: raise ValueError('star hub must be a valid vertex index')
+        for i in range(n): add(hub,i)
+    elif topology == 'complete':
+        for i in range(n):
+            for j in range(i+1,n): add(i,j)
     elif topology in ('ring','wide_ring'):
         k = 1 if topology == 'ring' else min(int(neighborhood), n-1)
         for i in range(n):

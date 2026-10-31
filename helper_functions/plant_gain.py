@@ -91,7 +91,14 @@ def direct_grid_gain(system,graph,points=2049):
 
 def small_gain(system,graph,W,eta=.95):
     """Return measured gamma, W spectral norm, loop product, numeric sufficient-status."""
-    gamma=full_gain(system,graph).gamma
+    gain=full_gain(system,graph)
+    gamma=gain.gamma
     norm=float(np.linalg.norm(np.asarray(W),ord=2))
-    return {'gamma':gamma,'W_spectral_norm':norm,'loop_gain':gamma*norm,
-            'below_one':bool(gamma*norm<1.),'within_eta':bool(gamma*norm<=eta+1e-10)}
+    product=gamma*norm
+    status=('at_or_below_eta' if product<=eta else
+            'between_eta_and_one' if product<1. else 'at_or_above_one')
+    return {'gamma':gamma,'W_spectral_norm':norm,'loop_gain':product,
+            'below_one':bool(product<1.),'within_eta':bool(product<=eta),
+            'status':status, 'eta':eta,
+            'gain_method':gain.method,
+            'rigorously_certified_upper_bound':False}

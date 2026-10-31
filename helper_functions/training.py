@@ -22,7 +22,8 @@ def baseline_scales(system,graph,horizon=70,samples=128,seed=291,device='cpu'):
 
 
 def train(system,graph,lam=0.,activation='identity',epochs=200,horizon=80,batch=128,
-          val_batch=128,lr=.002,eta=.95,seed=7,device='cpu',val_every=10):
+          val_batch=128,lr=.002,eta=.95,seed=7,device='cpu',val_every=10,
+          early_stopping_patience=None,min_delta=0.,validation_initial_states=None):
     """Learn W:(2,1) only, with J_E+lambda*J_U, projected after EACH step.
 
     All matrices, graph and K_i fixed across iterations. Train and validation RNG
@@ -31,17 +32,30 @@ def train(system,graph,lam=0.,activation='identity',epochs=200,horizon=80,batch=
     """
     if lam<0 or not np.isfinite(lam): raise ValueError('lambda must be >=0 and finite')
     if activation not in ('identity','tanh'): raise ValueError('activation')
-    if epochs<1 or horizon<1 or batch<1: raise ValueError('invalid training sizes')
+    if epochs<1 or horizon<1 or batch<1 or val_batch<1 or val_every<1 or lr<=0:
+        raise ValueError('invalid training settings')
+    if early_stopping_patience is not None and early_stopping_patience<1:
+        raise ValueError('patience is measured in validation checks and must be >=1')
+    if min_delta<0 or not np.isfinite(min_delta): raise ValueError('min_delta must be >=0')
     gamma=full_gain(system,graph).gamma
     cap=eta/gamma
     set_reproducible(seed)
     world=TorchWorld.from_system(system,graph,device)
     generator=torch.Generator(device='cpu').manual_seed(seed+10001)
     valgen=torch.Generator(device='cpu').manual_seed(seed+20003)
-    valX=torch.randn((val_batch,system.n,2),dtype=torch.float64,generator=valgen).to(device)
+    if validation_initial_states is None:
+        valX=torch.randn((val_batch,system.n,2),dtype=torch.float64,generator=valgen).to(device)
+    else:
+        valX=torch.as_tensor(np.asarray(validation_initial_states,np.float64).copy(),dtype=torch.float64,device=device)
+        if valX.ndim!=3 or valX.shape[1:]!=(system.n,2) or valX.shape[0]<1:
+            raise ValueError('validation_initial_states shape must be (M,N,2)')
     W=torch.nn.Parameter(torch.zeros((2,1),dtype=torch.float64,device=device))
     opt=torch.optim.Adam([W],lr=lr)
     history=[]
+    best_W=None
+    best_epoch=None
+    best_validation=float('inf')
+    stale_checks=0
     for epoch in range(1,epochs+1):
         initial=torch.randn((batch,system.n,2),dtype=torch.float64,generator=generator).to(device)
         opt.zero_grad(set_to_none=True)
@@ -52,15 +66,28 @@ def train(system,graph,lam=0.,activation='identity',epochs=200,horizon=80,batch=
         opt.step()
         norm=project_spectral_(W,cap)
         if norm>cap+1e-10: raise AssertionError('spectral projection failed')
-        record={'epoch':epoch,'train_J_E':float(je.item()),'train_J_U':float(ju.item()),
+        record={'epoch':epoch,'constraint_margin':float(cap-norm),'train_J_E':float(je.item()),'train_J_U':float(ju.item()),
                 'train_objective':float(loss.item()),'W_spectral_norm':norm,
                 'cap':cap, 'val_J_E':None,'val_J_U':None,'val_objective':None}
         if epoch==1 or epoch%val_every==0 or epoch==epochs:
             with torch.no_grad():
                 vje,vju,_=world.costs(valX,W,horizon,activation)
+            val_objective=float((vje+lam*vju).item())
             record.update(val_J_E=float(vje.item()),val_J_U=float(vju.item()),
-                          val_objective=float((vje+lam*vju).item()))
+                          val_objective=val_objective)
+            if best_W is None or val_objective < best_validation-min_delta:
+                best_validation=val_objective
+                best_epoch=epoch
+                best_W=W.detach().cpu().numpy().copy()
+                stale_checks=0
+            else:
+                stale_checks+=1
         history.append(record)
-    return {'W':W.detach().cpu().numpy().copy(),'history':history,'cap':cap,
+        if early_stopping_patience is not None and stale_checks>=early_stopping_patience:
+            break
+    return {'W':W.detach().cpu().numpy().copy(), 'best_W':best_W,
+            'best_epoch':best_epoch,'best_validation_objective':best_validation,
+            'stopped_early':len(history)<epochs,
+            'history':history,'cap':cap,
             'gamma_train':gamma,'lambda':float(lam),'activation':activation,
             'seed':seed,'train_seed':seed+10001,'validation_seed':seed+20003}
