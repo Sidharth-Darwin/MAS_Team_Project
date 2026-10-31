@@ -1,0 +1,17 @@
+TRAIN N=3 target_rho=0.905539, matching=0.00e+00, gamma=1.751687, J_E0=96.194 J_U0=54.925 lambda_balance=1.7514
+  trainN3_identity_lambda0: W=[-0.07021 -0.17857] norm=0.19187 J_E gain=+6.40% J_U reduction=+7.46%
+    N100_ring: gamma=1.7349 g_N=0.3329 gain_relation=<= J_E gain=+6.06%
+    N100_wide_ring: gamma=1.0879 g_N=0.2087 gain_relation=<= J_E gain=+4.22%
+    N1000_ring: gamma=1.7551 g_N=0.3367 gain_relation=> J_E gain=+5.92%
+    N1000_wide_ring: gamma=1.1082 g_N=0.2126 gain_relation=<= J_E gain=+4.10%
+  trainN3_identity_lambda1: W=[-0.0581  -0.17754] norm=0.18680 J_E gain=+6.33% J_U reduction=+8.09%
+    N100_ring: gamma=1.7349 g_N=0.3241 gain_relation=<= J_E gain=+6.01%
+    N100_wide_ring: gamma=1.0879 g_N=0.2032 gain_relation=<= J_E gain=+4.20%
+    N1000_ring: gamma=1.7551 g_N=0.3279 gain_relation=> J_E gain=+5.87%
+    N1000_wide_ring: gamma=1.1082 g_N=0.2070 gain_relation=<= J_E gain=+4.08%
+  trainN3_identity_lambda2: W=[-0.01923 -0.17378] norm=0.17484 J_E gain=+6.05% J_U reduction=+9.92%
+    N100_ring: gamma=1.7349 g_N=0.3033 gain_relation=<= J_E gain=+5.79%
+    N100_wide_ring: gamma=1.0879 g_N=0.1902 gain_relation=<= J_E gain=+4.10%
+    N1000_ring: gamma=1.7551 g_N=0.3069 gain_relation=> J_E gain=+5.64%
+    N1000_wide_ring: gamma=1.1082 g_N=0.1938 gain_relation=<= J_E gain=+3.98%
+RESULTS: /mnt/data/distributed_consensus/results/verified_final

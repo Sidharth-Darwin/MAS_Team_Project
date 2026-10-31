@@ -1,0 +1,12 @@
+[project]
+name = "distributed-neural-consensus-control"
+version = "0.1.0"
+description = "Fixed heterogeneous agents, direct Laplacian correction, numerical small-gain analysis"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "scipy>=1.10", "torch>=2.1", "matplotlib>=3.7"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

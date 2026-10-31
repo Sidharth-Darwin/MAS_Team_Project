@@ -1,0 +1,45 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.5, pytest-9.0.2, pluggy-1.6.0 -- /opt/pyvenv/bin/python
+cachedir: .pytest_cache
+metadata: {'Python': '3.13.5', 'Platform': 'Linux-6.18.57-x86_64-with-glibc2.41', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'anyio': '4.13.0', 'ddtrace': '4.4.0', 'Faker': '40.1.2', 'asyncio': '1.3.0', 'cov': '7.0.0', 'json-report': '1.5.0', 'metadata': '3.1.1'}, 'PLATFORM': 'linux/amd64', 'CI': 'true'}
+rootdir: /mnt/data/distributed_consensus
+configfile: pyproject.toml
+plugins: anyio-4.13.0, ddtrace-4.4.0, Faker-40.1.2, asyncio-1.3.0, cov-7.0.0, json-report-1.5.0, metadata-3.1.1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 33 items
+
+tests/test_math.py::test_01_physical_heterogeneity PASSED                [  3%]
+tests/test_math.py::test_02_pseudoinverse_is_actual PASSED               [  6%]
+tests/test_math.py::test_03_exact_matching PASSED                        [  9%]
+tests/test_math.py::test_04_reject_incompatible PASSED                   [ 12%]
+tests/test_math.py::test_05_no_controllability_assumption PASSED         [ 15%]
+tests/test_math.py::test_06_target_stable PASSED                         [ 18%]
+tests/test_math.py::test_07_reject_unstable_target PASSED                [ 21%]
+tests/test_math.py::test_08_reject_invalid_b PASSED                      [ 24%]
+tests/test_math.py::test_09_graph_symmetry_and_connectivity PASSED       [ 27%]
+tests/test_math.py::test_10_reject_directed_or_disconnected_graph PASSED [ 30%]
+tests/test_math.py::test_11_lrw_not_augmented PASSED                     [ 33%]
+tests/test_math.py::test_12_disagreement_is_local_sparse PASSED          [ 36%]
+tests/test_math.py::test_13_exact_direct_controller_no_bias PASSED       [ 39%]
+tests/test_math.py::test_14_activation_global_one_lipschitz_samples PASSED [ 42%]
+tests/test_math.py::test_15_physical_update PASSED                       [ 45%]
+tests/test_math.py::test_16_centralized_error_agreement PASSED           [ 48%]
+tests/test_math.py::test_17_gamma0_global_candidates PASSED              [ 51%]
+tests/test_math.py::test_18_full_gain_direct_grid PASSED                 [ 54%]
+tests/test_math.py::test_19_factorized_spatial_norm PASSED               [ 57%]
+tests/test_math.py::test_20_large_sparse_gain PASSED                     [ 60%]
+tests/test_math.py::test_21_projection_spectral PASSED                   [ 63%]
+tests/test_math.py::test_22_projection_after_every_training_epoch PASSED [ 66%]
+tests/test_math.py::test_23_inference_frozen_weight PASSED               [ 69%]
+tests/test_math.py::test_24_cost_action_indices_and_terminal PASSED      [ 72%]
+tests/test_math.py::test_25_objective_lambda_zero_and_positive PASSED    [ 75%]
+tests/test_math.py::test_26_torch_numpy_step_match PASSED                [ 78%]
+tests/test_math.py::test_27_training_repro_and_independent_validation PASSED [ 81%]
+tests/test_math.py::test_28_baseline_and_learned_identical_initial_conditions PASSED [ 84%]
+tests/test_math.py::test_29_settling_not_just_first_crossing PASSED      [ 87%]
+tests/test_math.py::test_30_consensus_invariance PASSED                  [ 90%]
+tests/test_math.py::test_31_bigger_network_gain_not_equivalent_to_loss_of_certificate PASSED [ 93%]
+tests/test_math.py::test_32_checkpoint_roundtrip PASSED                  [ 96%]
+tests/test_math.py::test_33_cpu_cuda_consistency SKIPPED (CUDA not i...) [100%]
+
+======================== 32 passed, 1 skipped in 3.34s =========================
