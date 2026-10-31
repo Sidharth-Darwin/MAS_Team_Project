@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import eigsh
-from .plants import check_target
+from src.distributed_consensus.control.plants import check_target
 
 
 @dataclass(frozen=True)

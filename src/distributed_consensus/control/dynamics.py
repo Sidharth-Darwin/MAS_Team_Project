@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 import numpy as np
 import torch
-from .controllers import correction_numpy, activate
+from src.distributed_consensus.control.controllers import correction_numpy, activate
 
 
 def step_numpy(states, system, graph, W=None, activation='identity', disturbance=None):

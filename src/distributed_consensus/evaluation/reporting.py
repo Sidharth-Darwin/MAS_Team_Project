@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from .graphs import from_edges
-from .plants import build_system
+from src.distributed_consensus.graphs import from_edges
+from src.distributed_consensus.control.plants import build_system
 
 
 def to_jsonable(obj):

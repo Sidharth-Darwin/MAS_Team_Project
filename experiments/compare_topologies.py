@@ -9,11 +9,11 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from helper_functions.graphs import make_graph
-from helper_functions.plants import generate_system
-from helper_functions.plant_gain import full_gain, small_gain, spatial_norm
-from helper_functions.evaluation import evaluate_pair
-from helper_functions.reporting import load_checkpoint, write_csv, write_json
+from src.distributed_consensus.graphs import make_graph
+from src.distributed_consensus.control.plants import generate_system
+from src.distributed_consensus.control.plant_gain import full_gain, small_gain, spatial_norm
+from src.distributed_consensus.evaluation.metrics import evaluate_pair
+from src.distributed_consensus.evaluation.reporting import load_checkpoint, write_csv, write_json
 
 TOPOLOGIES=('star','chain','ring','wide_ring','complete','random')
 
@@ -109,4 +109,5 @@ def main():
     plot_topologies(rows,out/'topology_comparison')
     print('Saved',out.resolve())
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    main()

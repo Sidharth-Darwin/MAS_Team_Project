@@ -1,9 +1,9 @@
 """Fixed-plant, differentiable projected-Adam optimization of shared W only."""
 import numpy as np
 import torch
-from .controllers import project_spectral_
-from .dynamics import TorchWorld
-from .plant_gain import full_gain
+from src.distributed_consensus.control.controllers import project_spectral_
+from src.distributed_consensus.control.dynamics import TorchWorld
+from src.distributed_consensus.control.plant_gain import full_gain
 
 
 def set_reproducible(seed=0):

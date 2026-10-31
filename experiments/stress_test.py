@@ -8,11 +8,11 @@ import sys
 from pathlib import Path
 import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from helper_functions.graphs import make_graph
-from helper_functions.plants import generate_system
-from helper_functions.plant_gain import small_gain
-from helper_functions.evaluation import evaluate_pair
-from helper_functions.reporting import load_checkpoint,write_csv,write_json
+from src.distributed_consensus.graphs import make_graph
+from src.distributed_consensus.control.plants import generate_system
+from src.distributed_consensus.control.plant_gain import small_gain
+from src.distributed_consensus.evaluation.metrics import evaluate_pair
+from src.distributed_consensus.evaluation.reporting import load_checkpoint,write_csv,write_json
 
 
 def run_stress(W,activation='identity',sizes=(100,1000),samples=3,horizon=70,

@@ -3,15 +3,15 @@ import numpy as np
 import pytest
 import torch
 from scipy import sparse
-from helper_functions.graphs import make_graph,from_edges,Graph
-from helper_functions.plants import (generate_system,build_system,DEFAULT_TARGET,
+from src.distributed_consensus.graphs import make_graph,from_edges,Graph
+from src.distributed_consensus.control.plants import (generate_system,build_system,DEFAULT_TARGET,
                                      check_target,matching_residual)
-from helper_functions.controllers import correction_numpy,project_spectral_,weight_norm
-from helper_functions.dynamics import step_numpy,rollout_numpy,TorchWorld
-from helper_functions.plant_gain import scalar_gain,full_gain,direct_grid_gain,small_gain
-from helper_functions.training import train,baseline_scales
-from helper_functions.evaluation import trajectory_metrics,evaluate_pair
-from helper_functions.reporting import save_checkpoint,load_checkpoint
+from src.distributed_consensus.control.controllers import correction_numpy,project_spectral_,weight_norm
+from src.distributed_consensus.control.dynamics import step_numpy,rollout_numpy,TorchWorld
+from src.distributed_consensus.control.plant_gain import scalar_gain,full_gain,direct_grid_gain,small_gain
+from src.distributed_consensus.learning.training import train,baseline_scales
+from src.distributed_consensus.evaluation.metrics import trajectory_metrics,evaluate_pair
+from src.distributed_consensus.evaluation.reporting import save_checkpoint,load_checkpoint
 
 @pytest.fixture
 def case():

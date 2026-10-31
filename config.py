@@ -12,5 +12,3 @@ class Config:
     eval_samples: int=24
     device: str='cpu'
     inference_sizes: tuple=(100,1000)
-    training_sizes: tuple=(3,5,10)
-    activations: tuple=('identity','tanh')

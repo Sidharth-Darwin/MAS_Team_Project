@@ -17,12 +17,12 @@ import sys
 from pathlib import Path
 import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from helper_functions.plants import generate_system
-from helper_functions.graphs import make_graph
-from helper_functions.plant_gain import full_gain,small_gain
-from helper_functions.training import train
-from helper_functions.evaluation import evaluate_pair
-from helper_functions.reporting import (save_checkpoint,load_checkpoint,write_json,
+from src.distributed_consensus.control.plants import generate_system
+from src.distributed_consensus.graphs import make_graph
+from src.distributed_consensus.control.plant_gain import full_gain,small_gain
+from src.distributed_consensus.learning.training import train
+from src.distributed_consensus.evaluation.metrics import evaluate_pair
+from src.distributed_consensus.evaluation.reporting import (save_checkpoint,load_checkpoint,write_json,
                                         write_csv,save_training_plot)
 
 

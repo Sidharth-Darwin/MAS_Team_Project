@@ -5,12 +5,12 @@ from pathlib import Path
 import numpy as np
 import torch
 from config import Config
-from helper_functions.graphs import make_graph
-from helper_functions.plants import generate_system,matching_residual,check_target
-from helper_functions.plant_gain import full_gain,small_gain
-from helper_functions.training import train,baseline_scales
-from helper_functions.evaluation import evaluate_pair
-from helper_functions.reporting import (write_json,write_csv,save_checkpoint,
+from distributed_consensus.graphs import make_graph
+from distributed_consensus.control.plants import generate_system,matching_residual,check_target
+from distributed_consensus.control.plant_gain import full_gain,small_gain
+from distributed_consensus.learning.training import train,baseline_scales
+from distributed_consensus.evaluation.metrics import evaluate_pair
+from distributed_consensus.evaluation.reporting import (write_json,write_csv,save_checkpoint,
         save_training_plot,save_curve_plot,save_tradeoff_plot,save_curve_csv,save_system)
 
 
@@ -18,6 +18,14 @@ def parse_args():
     p=argparse.ArgumentParser(description='Small-gain-constrained direct Laplacian controller')
     p.add_argument('--suite',choices=['quick','full'],default='quick')
     p.add_argument('--run-name',default=None)
+    p.add_argument('--train-topology',choices=('path','chain','star','ring','wide_ring','complete','random'),
+                   default='path', help='Connected undirected training graph; defaults to the original path')
+    p.add_argument('--train-graph-seed',type=int,default=None,
+                   help='Graph seed (default: seed + 100*N_train, preserving previous behavior)')
+    p.add_argument('--train-neighborhood',type=int,default=8,
+                   help='Number of forward neighbors for the wide_ring generator')
+    p.add_argument('--train-hub',type=int,default=0,
+                   help='Hub index for star training graphs')
     p.add_argument('--results-root',default='results')
     p.add_argument('--seed',type=int,default=16)
     p.add_argument('--epochs',type=int,default=None)
@@ -47,7 +55,8 @@ def execute(args):
     root=Path(args.results_root)/run_name
     if root.exists() and any(root.iterdir()): raise FileExistsError(f'results dir not empty: {root}')
     root.mkdir(parents=True,exist_ok=True)
-    write_json(root/'configuration.json',vars(cfg)|{'suite':args.suite,'run_name':run_name})
+    write_json(root/'configuration.json',vars(cfg)|{'suite':args.suite,'run_name':run_name,
+                      'cli_arguments':vars(args),'evaluation_model':'best_validation'})
     target=None
     sizes=[3] if args.suite=='quick' else [3,5,10]
     activations=['identity'] if args.suite=='quick' else ['identity','tanh']
@@ -56,7 +65,9 @@ def execute(args):
         for n_train in sizes:
             # Distinct experiments may use different networks; WITHIN one run never regenerate.
             system=generate_system(n_train,seed=cfg.seed+100*n_train)
-            graph=make_graph(n_train,'path',seed=cfg.seed+100*n_train)
+            graph_seed=(cfg.seed+100*n_train) if args.train_graph_seed is None else args.train_graph_seed
+            graph=make_graph(n_train,args.train_topology,seed=graph_seed,
+                             neighborhood=args.train_neighborhood,hub=args.train_hub)
             gain=full_gain(system,graph)
             je0,ju0=baseline_scales(system,graph,cfg.horizon,min(128,cfg.batch*2),seed=cfg.seed+501,device=cfg.device)
             if ju0<=1e-12: raise ValueError('baseline physical energy scale too small for normalized tradeoff')
@@ -76,13 +87,18 @@ def execute(args):
                         val_every=args.val_every,
                         early_stopping_patience=args.early_stopping_patience,
                         min_delta=args.min_delta)
-                    W=result['W']
+                    # Use validation-selected weights for ALL reported evaluation and inference.
+                    # Preserve the actual final-epoch weights in a separate checkpoint.
+                    final_W=result['W']
+                    W=result['best_W']
+                    if W is None:
+                        raise RuntimeError('training did not produce best-validation weights')
                     write_csv(folder/'training_history.csv',result['history'])
                     save_training_plot(folder/'training',result['history'],f'N={n_train}, {activation}, lambda={lam:.4g}')
                     save_checkpoint(folder/'checkpoint.npz',system,graph,W,activation,lam)
-                    save_checkpoint(folder/'final_checkpoint.npz',system,graph,W,activation,lam)
+                    save_checkpoint(folder/'final_checkpoint.npz',system,graph,final_W,activation,lam)
                     save_checkpoint(folder/'best_validation_checkpoint.npz',system,graph,
-                                    result['best_W'],activation,lam)
+                                    W,activation,lam)
                     local=evaluate_pair(system,graph,W,cfg.horizon,cfg.eval_samples,
                                         seed=cfg.seed+801,activation=activation)
                     write_csv(folder/'paired_small.csv',local['records'])
@@ -91,6 +107,9 @@ def execute(args):
                     save_curve_plot(folder/'disagreement_small',local['curves'],f'N={n_train}; {tag}')
                     save_curve_csv(folder/'disagreement_small.csv',local['curves'])
                     summary={'tag':tag,'N_train':n_train,'activation':activation,'lambda':lam,
+                             'training_topology':args.train_topology,'training_graph_seed':graph_seed,
+                             'evaluated_checkpoint':'best_validation_checkpoint.npz',
+                             'final_weight_norm':float(np.linalg.norm(final_W,2)),
                              'training_seed':result['seed'],'W':W,
                              'best_validation_epoch':result['best_epoch'],
                              'best_validation_objective':result['best_validation_objective'],
@@ -140,6 +159,8 @@ def execute(args):
                                   f'J_E gain={pair["J_E_improvement_pct"]:+.2f}%')
                     write_json(folder/'summary.json',summary)
                     all_rows.append({'tag':tag,'N_train':n_train,'activation':activation,'lambda':lam,
+                            'training_topology':args.train_topology,
+                            'evaluated_checkpoint':'best_validation_checkpoint.npz',
                             'gamma_train':gain.gamma,'W_norm':summary['norm'],
                             'training_loop_gain':summary['small_gain_train']['loop_gain'],
                             'J_E_baseline':local['baseline']['mean_J_E'],

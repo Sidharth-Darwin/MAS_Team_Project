@@ -1,4 +1,3 @@
-"""Physical heterogeneous agents, exact Moore-Penrose local matching."""
 from dataclasses import dataclass
 import numpy as np
 
@@ -11,7 +10,8 @@ def check_target(target):
     if a.ndim != 2 or a.shape[0] != a.shape[1] or not np.isfinite(a).all():
         raise ValueError('target must be finite square matrix')
     rho = float(np.max(np.abs(np.linalg.eigvals(a))))
-    if rho >= 1: raise ValueError(f'target not Schur stable: rho={rho}')
+    if rho >= 1: 
+        raise ValueError(f'target not Schur stable: rho={rho}')
     return rho
 
 
@@ -24,9 +24,11 @@ class System:
     target: np.ndarray
 
     @property
-    def n(self): return self.A.shape[0]
+    def n(self): 
+        return self.A.shape[0]
     @property
-    def p(self): return self.A.shape[1]
+    def p(self): 
+        return self.A.shape[1]
 
 
 def build_system(A, B, target=DEFAULT_TARGET, tol=1e-10):
@@ -44,7 +46,7 @@ def build_system(A, B, target=DEFAULT_TARGET, tol=1e-10):
         raise ValueError('at least two agents and finite entries required')
     if np.max(np.abs(b[:,0,0])) > tol or np.any(np.abs(b[:,1,0]) <= tol):
         raise ValueError('B_i must equal [0,b_i]^T with b_i nonzero')
-    pinvs = np.linalg.pinv(b)  # actual Moore-Penrose pseudoinverses
+    pinvs = np.linalg.pinv(b)
     diffs = target[None,:,:] - a
     compat = diffs - b @ (pinvs @ diffs)
     if np.max(np.abs(compat)) > tol:
@@ -55,13 +57,15 @@ def build_system(A, B, target=DEFAULT_TARGET, tol=1e-10):
         raise ValueError('numeric matching residual exceeds tolerance')
     if np.unique(np.round(b[:,1,0], decimals=12)).size < 2 or np.unique(np.round(a[:,1,:], decimals=12),axis=0).shape[0] < 2:
         raise ValueError('agents must have heterogeneous B coefficients and second rows')
-    for arr in (a,b,K,target): arr.setflags(write=False)
+    for arr in (a,b,K,target): 
+        arr.setflags(write=False)
     return System(a,b,K,target)
 
 
 def generate_system(n, target=DEFAULT_TARGET, seed=5, b_range=(.065,.14)):
     """Compatible heterogeneous A_i: fixed first row, independently sampled second rows and b_i."""
-    if n < 2: raise ValueError('N>=2')
+    if n < 2: 
+        raise ValueError('N>=2')
     rng = np.random.default_rng(seed)
     target = np.asarray(target,np.float64)
     a = np.broadcast_to(target, (n,2,2)).copy()

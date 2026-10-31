@@ -1,6 +1,6 @@
 """Paired, finite-horizon evaluation; separate convergence and small-gain criteria."""
 import numpy as np
-from .dynamics import rollout_numpy
+from src.distributed_consensus.control.dynamics import rollout_numpy
 
 
 def trajectory_metrics(history,epsilon_fraction=.01):
