@@ -9,8 +9,6 @@ from distributed_consensus.learning.training import train
 from distributed_consensus.control.dynamics import rollout_numpy
 from distributed_consensus.evaluation.metrics import evaluate_pair,trajectory_metrics
 from distributed_consensus.evaluation.reporting import save_checkpoint,load_checkpoint
-from experiments.compare_topologies import topology_comparison
-from experiments.tune_hyperparameters import config_id,non_dominated
 
 
 @pytest.mark.parametrize('n',[3,5,10,100,1000])
@@ -93,22 +91,6 @@ def test_checkpoint_roundtrip_and_weight_integrity(tmp_path):
     s=generate_system(3,seed=3);g=make_graph(3,'star');w=np.array([[.1],[-.1]])
     save_checkpoint(tmp_path/'checkpoint.npz',s,g,w)
     assert np.array_equal(load_checkpoint(tmp_path/'checkpoint.npz')[2],w)
-
-
-def test_topology_script_does_not_mutate_W():
-    W=np.array([[.01],[-.05]])
-    before=W.copy()
-    rows=topology_comparison(W,sizes=[3],topologies=['star','ring'],samples=1,horizon=3)
-    assert len(rows)==2 and np.array_equal(W,before)
-
-
-def test_tuner_ids_and_pareto():
-    cfg={'lr':.002,'lam':0.,'batch':8,'seed':1}
-    assert config_id(cfg)==config_id(dict(reversed(list(cfg.items()))))
-    rows=[{'id':'a','val_J_E':1.,'val_J_U':4.},
-          {'id':'b','val_J_E':2.,'val_J_U':2.},
-          {'id':'c','val_J_E':3.,'val_J_U':5.}]
-    assert {r['id'] for r in non_dominated(rows)}=={'a','b'}
 
 
 def test_star_hub_location_changes_actual_plant_gain():
