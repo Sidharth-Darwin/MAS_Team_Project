@@ -32,7 +32,7 @@ def test_external_simulator_accepts_direct_and_changing_adjacency():
 def test_main_evaluates_best_and_preserves_final_checkpoint(tmp_path, monkeypatch):
     """Regression: the default evaluation must not quietly use last-epoch weights."""
     import sys
-    import main as runner
+    from experiments import train_controller as runner
     original_train = runner.train
 
     def distinguish_best_from_final(*args, **kwargs):
@@ -42,24 +42,31 @@ def test_main_evaluates_best_and_preserves_final_checkpoint(tmp_path, monkeypatc
 
     monkeypatch.setattr(runner, 'train', distinguish_best_from_final)
     monkeypatch.setattr(sys, 'argv', [
-        'main.py', '--suite', 'quick', '--run-name', 'smoke',
+        'train_controller.py', '--suite', 'quick', '--run-name', 'smoke',
         '--results-root', str(tmp_path), '--epochs', '3', '--horizon', '4',
         '--batch', '4', '--eval-samples', '2', '--lambda-values', '0',
-        '--inference-sizes', '--train-topology', 'star', '--device', 'cpu'
+        '--train-topology', 'star', '--device', 'cpu'
     ])
-    # No inference sizes in this integration test: graph and model handling only.
     root = runner.execute(runner.parse_args())
     folder = root / 'trainN3_identity_lambda0'
     _, graph, default_w, _, _ = load_checkpoint(folder / 'checkpoint.npz')
-    _, _, best_w, _, _ = load_checkpoint(folder / 'best_validation_checkpoint.npz')
     _, _, final_w, _, _ = load_checkpoint(folder / 'final_checkpoint.npz')
-    assert np.array_equal(default_w, best_w)
+    assert not (folder / 'best_validation_checkpoint.npz').exists()
     assert np.array_equal(default_w, np.zeros((2,1)))
     assert not np.array_equal(default_w, final_w)
     assert graph.adjacency[0,2] == 1  # star with hub 0, not path graph
     summary = json.loads((folder / 'summary.json').read_text())
-    assert summary['evaluated_checkpoint'] == 'best_validation_checkpoint.npz'
+    assert summary['evaluated_checkpoint'] == 'checkpoint.npz'
     assert summary['training_topology'] == 'star'
     assert summary['local_eval']['J_E_improvement_pct'] == pytest.approx(0., abs=1e-12)
     meta = json.loads((root / 'configuration.json').read_text())
     assert meta['cli_arguments']['train_topology'] == 'star'
+
+
+def test_train_cli_rejects_zero_instead_of_using_default(tmp_path):
+    from experiments.train_controller import execute, parse_args
+    args = parse_args(['--epochs', '0', '--run-name', 'bad',
+                       '--results-root', str(tmp_path), '--device', 'cpu'])
+    with pytest.raises(ValueError, match='must be positive'):
+        execute(args)
+    assert not (tmp_path / 'bad').exists()

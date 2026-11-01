@@ -4,15 +4,14 @@ The reported J_U measures commanded physical control, excluding the external per
 This script never modifies the training method or modifies/rescales W.
 """
 import argparse
-import sys
 from pathlib import Path
 import numpy as np
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from src.distributed_consensus.graphs import make_graph
-from src.distributed_consensus.control.plants import generate_system
-from src.distributed_consensus.control.plant_gain import small_gain
-from src.distributed_consensus.evaluation.metrics import evaluate_pair
-from src.distributed_consensus.evaluation.reporting import load_checkpoint,write_csv,write_json
+
+from distributed_consensus.graphs import make_graph
+from distributed_consensus.control.plants import generate_system
+from distributed_consensus.control.plant_gain import small_gain
+from distributed_consensus.evaluation.metrics import evaluate_pair
+from distributed_consensus.evaluation.reporting import load_checkpoint,write_csv,write_json
 
 
 def run_stress(W,activation='identity',sizes=(100,1000),samples=3,horizon=70,
@@ -58,7 +57,7 @@ def run_stress(W,activation='identity',sizes=(100,1000),samples=3,horizon=70,
     return rows
 
 
-def main():
+def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--checkpoint',required=True)
     p.add_argument('--sizes',nargs='+',type=int,default=[100,1000])
@@ -67,7 +66,7 @@ def main():
     p.add_argument('--seed',type=int,default=21)
     p.add_argument('--disturbance-amplitude',type=float,default=3.)
     p.add_argument('--out',default='results/stress_tests')
-    a=p.parse_args()
+    a=p.parse_args(argv)
     _,_,W,activation,_=load_checkpoint(a.checkpoint)
     rows=run_stress(W,activation,a.sizes,a.samples,a.horizon,a.seed,a.disturbance_amplitude)
     out=Path(a.out);out.mkdir(parents=True,exist_ok=True)
@@ -76,4 +75,5 @@ def main():
        'interpretation':'Not formally certified; gain >=1 implies inconclusive sufficient condition, not instability.'})
     print('Saved',out.resolve(),len(rows),'evaluations')
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    main()

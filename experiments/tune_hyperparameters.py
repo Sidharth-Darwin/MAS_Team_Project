@@ -16,13 +16,13 @@ import json
 import sys
 from pathlib import Path
 import numpy as np
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from src.distributed_consensus.control.plants import generate_system
-from src.distributed_consensus.graphs import make_graph
-from src.distributed_consensus.control.plant_gain import full_gain,small_gain
-from src.distributed_consensus.learning.training import train
-from src.distributed_consensus.evaluation.metrics import evaluate_pair
-from src.distributed_consensus.evaluation.reporting import (save_checkpoint,load_checkpoint,write_json,
+
+from distributed_consensus.control.plants import generate_system
+from distributed_consensus.graphs import make_graph
+from distributed_consensus.control.plant_gain import full_gain,small_gain
+from distributed_consensus.learning.training import train
+from distributed_consensus.evaluation.metrics import evaluate_pair
+from distributed_consensus.evaluation.reporting import (save_checkpoint,load_checkpoint,write_json,
                                         write_csv,save_training_plot)
 
 
@@ -111,7 +111,7 @@ def execute(a):
         if resultpath.exists():
             old=json.loads(resultpath.read_text())
             if old.get('config')!=cfg:raise ValueError('candidate id collision')
-            if not (folder/'best_validation_checkpoint.npz').exists():
+            if not (folder/'checkpoint.npz').exists():
                 raise ValueError('Completed metadata found but checkpoint missing')
             print('RESUME/SKIP:',cid)
             return old
@@ -125,7 +125,7 @@ def execute(a):
             validation_initial_states=common_val)
         save_checkpoint(folder/'final_checkpoint.npz',system,graph,r['W'],
                         cfg['activation'],cfg['lam'])
-        save_checkpoint(folder/'best_validation_checkpoint.npz',system,graph,r['best_W'],
+        save_checkpoint(folder/'checkpoint.npz',system,graph,r['best_W'],
                         cfg['activation'],cfg['lam'])
         write_csv(folder/'training_history.csv',r['history'])
         save_training_plot(folder/'training',r['history'],f'{cid} {cfg["activation"]}')
@@ -141,8 +141,8 @@ def execute(a):
              'val_J_E':je,'val_J_U':ju,'val_J_pair':val['learned']['mean_J_pair'],
              'baseline_val_J_E':je_ref,'baseline_val_J_U':ju_ref,
              'selection_score':score,'selection_energy_weight':a.selection_energy_weight,
-             'small_gain':small_gain(system,graph,r['best_W']),
-             'checkpoint':str((folder/'best_validation_checkpoint.npz').relative_to(out))}
+             'small_gain':small_gain(system,graph,r['best_W'],eta=a.eta),
+             'checkpoint':str((folder/'checkpoint.npz').relative_to(out))}
         # Mark complete only after every result/checkpoint is saved.
         write_json(resultpath,record)
         return record
@@ -192,7 +192,7 @@ def execute(a):
                 (a.finalist_samples,n,2))  # Finalist evaluation, NEVER used in selection
             for topology in ('ring','star'):
                 g=make_graph(n,topology,seed=a.graph_seed+n)
-                sg=small_gain(large,g,W)
+                sg=small_gain(large,g,W,eta=a.eta)
                 metrics=evaluate_pair(large,g,W,a.finalist_horizon,
                     a.finalist_samples,activation=act,initial_states=initial)
                 finalists.append({'candidate_id':r['id'],'N':n,'topology':topology,
@@ -220,12 +220,12 @@ def persist(records,out):
     write_json(out/'candidates.json',list(records.values()))
 
 
-def parse_args():
+def parse_args(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--out',default='results/hyperparameter_search')
     p.add_argument('--train-size',type=int,default=3)
     p.add_argument('--train-topology',default='chain',
-      choices=['star','chain','path','ring','wide_ring','complete','random'])
+      choices=['star','chain','ring','wide_ring','complete','random'])
     p.add_argument('--system-seed',type=int,default=316)
     p.add_argument('--graph-seed',type=int,default=16)
     p.add_argument('--validation-seed',type=int,default=90001)
@@ -254,6 +254,11 @@ def parse_args():
     p.add_argument('--finalist-sizes',type=int,nargs='+',default=[100,1000])
     p.add_argument('--finalist-samples',type=int,default=3)
     p.add_argument('--finalist-horizon',type=int,default=70)
-    return p.parse_args()
+    return p.parse_args(argv)
 
-if __name__=='__main__':execute(parse_args())
+def main(argv=None):
+    return execute(parse_args(argv))
+
+
+if __name__ == '__main__':
+    main()

@@ -3,19 +3,19 @@ import numpy as np
 import pytest
 import torch
 from scipy import sparse
-from src.distributed_consensus.graphs import make_graph,from_edges,Graph
-from src.distributed_consensus.control.plants import (generate_system,build_system,DEFAULT_TARGET,
+from distributed_consensus.graphs import make_graph,from_edges,Graph
+from distributed_consensus.control.plants import (generate_system,build_system,DEFAULT_TARGET,
                                      check_target,matching_residual)
-from src.distributed_consensus.control.controllers import correction_numpy,project_spectral_,weight_norm
-from src.distributed_consensus.control.dynamics import step_numpy,rollout_numpy,TorchWorld
-from src.distributed_consensus.control.plant_gain import scalar_gain,full_gain,direct_grid_gain,small_gain
-from src.distributed_consensus.learning.training import train,baseline_scales
-from src.distributed_consensus.evaluation.metrics import trajectory_metrics,evaluate_pair
-from src.distributed_consensus.evaluation.reporting import save_checkpoint,load_checkpoint
+from distributed_consensus.control.controllers import correction_numpy,project_spectral_,weight_norm
+from distributed_consensus.control.dynamics import step_numpy,rollout_numpy,TorchWorld
+from distributed_consensus.control.plant_gain import scalar_gain,full_gain,direct_grid_gain,small_gain
+from distributed_consensus.learning.training import train,baseline_scales
+from distributed_consensus.evaluation.metrics import trajectory_metrics,evaluate_pair
+from distributed_consensus.evaluation.reporting import save_checkpoint,load_checkpoint
 
 @pytest.fixture
 def case():
-    s=generate_system(3,seed=16);g=make_graph(3,'path')
+    s=generate_system(3,seed=16);g=make_graph(3,'chain')
     return s,g
 
 

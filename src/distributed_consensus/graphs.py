@@ -19,7 +19,7 @@ class Graph:
             raise ValueError('Edges must be positive finite weights')
         if np.any(a.diagonal() != 0):
             raise ValueError('Self-loops are not supported')
-        if (a - a.T).nnz and np.max(np.abs((a-a.T).data)) > 1e-12:
+        if (a != a.T).nnz:
             raise ValueError('Graph must be undirected (symmetric)')
         deg = np.asarray(a.sum(axis=1)).ravel()
         if np.any(deg <= 0) or connected_components(a, directed=False)[0] != 1:
@@ -61,13 +61,13 @@ def from_edges(n, rows, cols, weights=None):
     return Graph(sparse.coo_matrix((data, (rows, cols)), shape=(n,n)).tocsr())
 
 
-def make_graph(n, topology='path', seed=0, neighborhood=8, hub=0):
-    """Connected undirected star, chain/path, ring, wide_ring, complete, random graphs."""
+def make_graph(n, topology='chain', seed=0, neighborhood=8, hub=0):
+    """Connected undirected star, chain, ring, wide_ring, complete, random graphs."""
     if n < 2: raise ValueError('N>=2 required')
     pairs = set()
     def add(i,j):
         if i != j: pairs.add((min(i,j), max(i,j)))
-    if topology in ('path', 'chain'):
+    if topology == 'chain':
         for i in range(n-1): add(i,i+1)
     elif topology == 'star':
         if not 0<=hub<n: raise ValueError('star hub must be a valid vertex index')
@@ -90,3 +90,29 @@ def make_graph(n, topology='path', seed=0, neighborhood=8, hub=0):
     for i,j in sorted(pairs):
         rows.extend((i,j)); cols.extend((j,i))
     return from_edges(n,rows,cols)
+
+
+def load_graph(path):
+    """Load a validated undirected Graph from a standard adjacency file.
+
+    Supported: dense NumPy .npy, scipy.sparse.save_npz .npz, or .npz with
+    an ``adjacency`` matrix. Also accepts the row/col/n/edge_weights keys of
+    the existing numeric-only saved-system files.
+    """
+    from pathlib import Path
+
+    path = Path(path)
+    if path.suffix == '.npy':
+        return Graph(np.load(path, allow_pickle=False))
+    if path.suffix != '.npz':
+        raise ValueError('graph must be .npy or .npz')
+    with np.load(path, allow_pickle=False) as data:
+        names = set(data.files)
+        if {'data', 'indices', 'indptr', 'shape', 'format'} <= names:
+            # SciPy sparse .npz: preserve sparse representation for large graphs.
+            return Graph(sparse.load_npz(path))
+        if 'adjacency' in names:
+            return Graph(data['adjacency'])
+        if {'n', 'row', 'col', 'edge_weights'} <= names:
+            return from_edges(int(data['n']), data['row'], data['col'], data['edge_weights'])
+    raise ValueError('unsupported .npz graph: expected sparse CSR, adjacency, or saved graph edges')

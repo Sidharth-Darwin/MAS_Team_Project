@@ -11,4 +11,3 @@ class Config:
     batch: int=128
     eval_samples: int=24
     device: str='cpu'
-    inference_sizes: tuple=(100,1000)

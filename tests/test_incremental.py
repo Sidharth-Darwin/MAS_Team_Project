@@ -2,13 +2,13 @@
 import json
 import numpy as np
 import pytest
-from src.distributed_consensus.graphs import make_graph
-from src.distributed_consensus.control.plants import generate_system
-from src.distributed_consensus.control.plant_gain import small_gain,spatial_norm
-from src.distributed_consensus.learning.training import train
-from src.distributed_consensus.control.dynamics import rollout_numpy
-from src.distributed_consensus.evaluation.metrics import evaluate_pair,trajectory_metrics
-from src.distributed_consensus.evaluation.reporting import save_checkpoint,load_checkpoint
+from distributed_consensus.graphs import make_graph
+from distributed_consensus.control.plants import generate_system
+from distributed_consensus.control.plant_gain import small_gain,spatial_norm
+from distributed_consensus.learning.training import train
+from distributed_consensus.control.dynamics import rollout_numpy
+from distributed_consensus.evaluation.metrics import evaluate_pair,trajectory_metrics
+from distributed_consensus.evaluation.reporting import save_checkpoint,load_checkpoint
 from experiments.compare_topologies import topology_comparison
 from experiments.tune_hyperparameters import config_id,non_dominated
 
@@ -89,7 +89,7 @@ def test_training_best_final_and_margin():
     assert r['best_W'].shape==r['W'].shape==(2,1)
 
 
-def test_old_checkpoint_compatibility(tmp_path):
+def test_checkpoint_roundtrip_and_weight_integrity(tmp_path):
     s=generate_system(3,seed=3);g=make_graph(3,'star');w=np.array([[.1],[-.1]])
     save_checkpoint(tmp_path/'checkpoint.npz',s,g,w)
     assert np.array_equal(load_checkpoint(tmp_path/'checkpoint.npz')[2],w)
@@ -112,7 +112,7 @@ def test_tuner_ids_and_pareto():
 
 
 def test_star_hub_location_changes_actual_plant_gain():
-    from src.distributed_consensus.control.plant_gain import full_gain
+    from distributed_consensus.control.plant_gain import full_gain
     s=generate_system(20,seed=4,b_range=(.04,.25))
     lo=int(np.argmin(s.B[:,1,0]));hi=int(np.argmax(s.B[:,1,0]))
     gl=make_graph(20,'star',hub=lo)
