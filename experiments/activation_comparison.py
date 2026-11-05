@@ -20,11 +20,18 @@ from experiments._common import (
     write_json, train_model,
 )
 
+from experiments._paper_gnn_baseline import (train_paper_gnn, save_paper_checkpoint,
+                                              evaluate_paper, save_training_history)
+
+
+PAPER_SHARED_OUTPUT = False
 
 EXPERIMENT = '01_activation_comparison'
 
 
 def run(args):
+    if any(n != 3 for n in args.sizes):
+        raise ValueError('Experiment 01 uses paper per-agent K_i trained for N=3; sizes must be [3]')
     out = ensure_empty_dir(Path(args.out))
     (out / 'checkpoints').mkdir()
     (out / 'figures').mkdir()
@@ -46,6 +53,18 @@ def run(args):
             run_folder.mkdir(exist_ok=True)
             save_training_artifacts(run_folder, result['history'])
             trained[activation] = {'W': W, 'result': result}
+
+        # Matched training batches/validation seeds, same physical plant and objective.
+        # No projection or clipping on paper H, K_i. For N-transfer tie K_i across nodes.
+        paper, paper_info = train_paper_gnn(
+            train_system, train_graph, args, seed=args.seed + 1000 * rep + 101,
+            shared_output=PAPER_SHARED_OUTPUT)
+        save_paper_checkpoint(out / 'checkpoints' / f'rep{rep:02d}_paper_gnn.npz',
+                              paper, train_system, train_graph, paper_info)
+        save_training_history(out / 'checkpoints' / f'rep{rep:02d}_paper_training.csv',
+                              paper_info['history'])
+        print(f'TRAIN paper_gnn rep={rep} best_epoch={paper_info["best_epoch"]} '
+              f'best_validation={paper_info["best_validation_objective"]:.5g}', flush=True)
 
         for n in args.sizes:
             test_graph = er_connected_graph(n, args.er_prob, seed=args.seed + 1000 * rep + 211 + n)
@@ -99,6 +118,21 @@ def run(args):
                 for row in summarize_time_series(learned_histories, ('error_rms', 'centered_rms', 'state_rms', 'control_rms')):
                     curve_rows.append({'repeat': rep, 'N': n, 'method': method, **row})
 
+            paper_histories, paper_rep, paper_stats = evaluate_paper(
+                paper, test_system, test_graph, initial_states, args.eval_horizon,
+                args.threshold, {'repeat': rep, 'N': n, 'gamma_train': args.gamma_train,
+                                 'gamma_test': args.gamma_train},
+                summary_rows, trajectory_rows, curve_rows)
+            series_map['paper_gnn'] = paper_histories
+            representatives['paper_gnn'] = paper_histories[0]
+            raw_representatives['paper_gnn'] = paper_rep
+            for method_name in ('identity','tanh'):
+                ours = next(r for r in summary_rows if r['repeat'] == rep and
+                            r['N'] == n and r['method'] == method_name)
+                ours['J_E_improvement_vs_paper_pct'] = (
+                    100*(paper_stats['mean_J_E'] - ours['mean_J_E'])/paper_stats['mean_J_E']
+                    if paper_stats['mean_J_E'] > 0 else None)
+
             prefix = out / 'figures' / f'N{n}_rep{rep:02d}'
             plot_metric_with_band(prefix.with_name(prefix.name + '_error_convergence.png'), series_map, 'error_rms', threshold=args.threshold,
                                   ylabel='RMS disagreement per agent', title=f'Experiment 01 error convergence, N={n}, rep={rep}')
@@ -124,7 +158,7 @@ def run(args):
     write_csv_any(out / 'trajectory_metrics.csv', trajectory_rows)
     write_csv_any(out / 'curves.csv', curve_rows)
     write_json(out / 'README.json', {'description': 'Experiment 01 activation comparison', 'png_only': True})
-    return {'out': str(out), 'trained_models': args.repeats * 2, 'trajectory_rows': len(trajectory_rows), 'summary_rows': len(summary_rows)}
+    return {'out': str(out), 'trained_models': args.repeats * 3, 'trajectory_rows': len(trajectory_rows), 'summary_rows': len(summary_rows)}
 
 
 def parse_args(argv=None):
@@ -146,6 +180,7 @@ def parse_args(argv=None):
     p.add_argument('--seed', type=int, default=16)
     p.add_argument('--device', choices=('auto', 'cpu', 'cuda'), default='auto')
     p.add_argument('--er-prob', type=float, default=None, help='ER edge probability; default is selected from N')
+    p.add_argument('--paper-hidden', type=int, default=4, help='one-layer paper GNN hidden features')
     p.add_argument('--val-every', type=int, default=10)
     p.add_argument('--early-stopping-patience', type=int, default=None)
     p.add_argument('--min-delta', type=float, default=0.0)

@@ -454,7 +454,7 @@ def plot_settling_comparison(path: Path, rows: list[dict], x_key: str, title: st
     if not rows:
         return
     labels = sorted(set(str(r[x_key]) for r in rows), key=lambda x: (int(x) if x.isdigit() else x))
-    methods = [m for m in ('baseline', 'identity', 'tanh', 'learned') if any(r['method'] == m for r in rows)]
+    methods = [m for m in ('baseline', 'paper_gnn', 'identity', 'tanh', 'learned') if any(r['method'] == m for r in rows)]
     if not methods:
         return
     x = np.arange(len(labels), dtype=float)
@@ -464,7 +464,7 @@ def plot_settling_comparison(path: Path, rows: list[dict], x_key: str, title: st
         settled_fraction = []
         median_time = []
         for label in labels:
-            values = [r['baseline_settling_time' if method == 'baseline' else 'learned_settling_time']
+            values = [r['baseline_settling_time' if method == 'baseline' else ('paper_gnn_settling_time' if method == 'paper_gnn' else 'learned_settling_time')]
                       for r in rows if str(r[x_key]) == label and r['method'] == method]
             good = [float(v) for v in values if v is not None]
             settled_fraction.append(float(len(good)/len(values)) if values else np.nan)
@@ -486,7 +486,7 @@ def plot_settling_comparison(path: Path, rows: list[dict], x_key: str, title: st
 
 def plot_numeric_conditions(path: Path, rows: list[dict], xkey: str, title: str, eta: float):
     """Compare full plant gain with actual frozen-weight loop gain (not just gamma)."""
-    rows = [r for r in rows if r.get('method') != 'baseline']
+    rows = [r for r in rows if r.get('method') not in ('baseline', 'paper_gnn')]
     groups = defaultdict(list)
     for r in rows:
         groups[str(r[xkey])].append(r)

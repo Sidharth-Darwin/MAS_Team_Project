@@ -18,6 +18,11 @@ from experiments._common import (
     plot_metric_with_band, plot_representative_agents, plot_cumulative_energy,
     plot_settling_bars, draw_graph_figure, save_checkpoint, write_csv_any, save_trace_npz, plot_settling_grouped, plot_settling_comparison, plot_numeric_conditions, train_model,
 )
+from experiments._paper_gnn_baseline import (train_paper_gnn, save_paper_checkpoint,
+                                              evaluate_paper, save_training_history)
+
+
+PAPER_SHARED_OUTPUT = False
 
 EXPERIMENT = '04_topology_generalization'
 
@@ -41,6 +46,18 @@ def run(args):
         run_folder = out / 'checkpoints' / f'rep{rep:02d}_identity'
         run_folder.mkdir(exist_ok=True)
         save_training_artifacts(run_folder, result['history'])
+
+        # Matched training batches/validation seeds, same physical plant and objective.
+        # No projection or clipping on paper H, K_i. For N-transfer tie K_i across nodes.
+        paper, paper_info = train_paper_gnn(
+            train_system, train_graph, args, seed=args.seed + 1000 * rep + 101,
+            shared_output=PAPER_SHARED_OUTPUT)
+        save_paper_checkpoint(out / 'checkpoints' / f'rep{rep:02d}_paper_gnn.npz',
+                              paper, train_system, train_graph, paper_info)
+        save_training_history(out / 'checkpoints' / f'rep{rep:02d}_paper_training.csv',
+                              paper_info['history'])
+        print(f'TRAIN paper_gnn rep={rep} best_epoch={paper_info["best_epoch"]} '
+              f'best_validation={paper_info["best_validation_objective"]:.5g}', flush=True)
 
         # same physical system and same initial states across all tested topologies
         base_system = train_system
@@ -72,16 +89,26 @@ def run(args):
             for label, histories in (('baseline', baseline_histories), ('learned', learned_histories)):
                 for row in summarize_time_series(histories, ('error_rms', 'centered_rms', 'state_rms', 'control_rms')):
                     curve_rows.append({'repeat': rep, 'N': args.n, 'topology': topology, 'method': label, **row})
-            reps = {'baseline': baseline_histories[0], 'learned': learned_histories[0]}
+            paper_histories, paper_rep, paper_stats = evaluate_paper(
+                paper, base_system, graph, initial_states, args.eval_horizon,
+                args.threshold, {'repeat':rep,'N':args.n,'topology':topology,
+                                 'gamma_train':args.gamma_train,'gamma_test':gamma},
+                summary_rows, trajectory_rows, curve_rows)
+            summary_rows[-2]['J_E_improvement_vs_paper_pct'] = (
+                100*(paper_stats['mean_J_E'] - learned_stats['mean_J_E'])/paper_stats['mean_J_E']
+                if paper_stats['mean_J_E'] > 0 else None)
+            representative['paper_gnn'] = paper_rep
+
+            reps = {'baseline': baseline_histories[0], 'learned': learned_histories[0], 'paper_gnn': paper_histories[0]}
             prefix = topo_fig / f'rep{rep:02d}'
-            plot_metric_with_band(prefix.with_name(prefix.name + '_error_convergence.png'), {'baseline': baseline_histories, 'learned': learned_histories}, 'error_rms', threshold=args.threshold,
+            plot_metric_with_band(prefix.with_name(prefix.name + '_error_convergence.png'), {'baseline': baseline_histories, 'learned': learned_histories, 'paper_gnn': paper_histories}, 'error_rms', threshold=args.threshold,
                                   ylabel='RMS disagreement per agent', title=f'Experiment 04 error convergence, topology={topology}, rep={rep}')
             plot_representative_agents(prefix.with_name(prefix.name + '_agent_error.png'), reps, 'error_agent', 'Agent disagreement norm', f'Experiment 04 representative disagreement, {topology}, rep={rep}')
             plot_representative_agents(prefix.with_name(prefix.name + '_state_x1.png'), reps, 'state_component_1', 'State component x₁', f'Experiment 04 representative x₁, {topology}, rep={rep}')
             plot_representative_agents(prefix.with_name(prefix.name + '_state_x2.png'), reps, 'state_component_2', 'State component x₂', f'Experiment 04 representative x₂, {topology}, rep={rep}')
             plot_representative_agents(prefix.with_name(prefix.name + '_control_total.png'), reps, 'control_total', 'Physical control input', f'Experiment 04 representative physical control, {topology}, rep={rep}')
             plot_representative_agents(prefix.with_name(prefix.name + '_correction_input.png'), reps, 'control_correction', 'Learned correction input', f'Experiment 04 learned correction, {topology}, rep={rep}')
-            plot_metric_with_band(prefix.with_name(prefix.name + '_centered_disagreement.png'), {'baseline': baseline_histories, 'learned': learned_histories}, 'centered_rms', ylabel='Mean-centered disagreement RMS', title=f'Experiment 04 mean-centered disagreement, {topology}, rep={rep}')
+            plot_metric_with_band(prefix.with_name(prefix.name + '_centered_disagreement.png'), {'baseline': baseline_histories, 'learned': learned_histories, 'paper_gnn': paper_histories}, 'centered_rms', ylabel='Mean-centered disagreement RMS', title=f'Experiment 04 mean-centered disagreement, {topology}, rep={rep}')
             save_trace_npz(out / 'traces' / f'{topology}_rep{rep:02d}.npz', representative, base_system, graph, initial_states[0])
             plot_cumulative_energy(prefix.with_name(prefix.name + '_cumulative_energy.png'), reps, f'Experiment 04 cumulative control energy, {topology}, rep={rep}')
             print(f'TEST topology rep={rep} topology={topology} gamma_test={gamma:.5f}', flush=True)
@@ -92,7 +119,7 @@ def run(args):
     write_csv_any(out / 'summary.csv', summary_rows)
     write_csv_any(out / 'trajectory_metrics.csv', trajectory_rows)
     write_csv_any(out / 'curves.csv', curve_rows)
-    return {'out': str(out), 'trained_models': args.repeats, 'trajectory_rows': len(trajectory_rows), 'summary_rows': len(summary_rows)}
+    return {'out': str(out), 'trained_models': args.repeats * 2, 'trajectory_rows': len(trajectory_rows), 'summary_rows': len(summary_rows)}
 
 
 def parse_args(argv=None):
@@ -115,6 +142,7 @@ def parse_args(argv=None):
     p.add_argument('--seed', type=int, default=16)
     p.add_argument('--device', choices=('auto', 'cpu', 'cuda'), default='auto')
     p.add_argument('--er-prob', type=float, default=None)
+    p.add_argument('--paper-hidden', type=int, default=4, help='one-layer paper GNN hidden features')
     p.add_argument('--val-every', type=int, default=10)
     p.add_argument('--early-stopping-patience', type=int, default=None)
     p.add_argument('--min-delta', type=float, default=0.0)

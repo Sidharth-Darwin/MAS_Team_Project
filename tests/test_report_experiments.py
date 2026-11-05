@@ -6,8 +6,12 @@ def test_activation_experiment_smoke(tmp_path):
     from experiments.activation_comparison import parse_args, run
     out = tmp_path / 'activation'
     result = run(parse_args(['--quick', '--out', str(out)]))
-    assert result['trained_models'] == 2
+    assert result['trained_models'] == 3
     assert (out / 'summary.csv').exists()
+    import csv
+    with (out/'summary.csv').open() as f:
+        methods = {r['method'] for r in csv.DictReader(f)}
+    assert 'paper_gnn' in methods
     assert any((out / 'figures').glob('*_state_x1.png'))
     assert any((out / 'figures').glob('*_control_total.png'))
 
@@ -16,8 +20,12 @@ def test_size_experiment_smoke(tmp_path):
     from experiments.network_size_generalization import parse_args, run
     out = tmp_path / 'size'
     result = run(parse_args(['--quick', '--out', str(out)]))
-    assert result['trained_models'] == 1
+    assert result['trained_models'] == 2
     assert (out / 'summary.csv').exists()
+    import csv
+    with (out/'summary.csv').open() as f:
+        methods = {r['method'] for r in csv.DictReader(f)}
+    assert 'paper_gnn' in methods
     assert (out / 'figures' / 'settling_vs_size.png').exists()
 
 
@@ -25,8 +33,12 @@ def test_gain_experiment_smoke(tmp_path):
     from experiments.plant_gain_transfer import parse_args, run
     out = tmp_path / 'gain'
     result = run(parse_args(['--quick', '--out', str(out)]))
-    assert result['trained_models'] == 1
+    assert result['trained_models'] == 2
     assert (out / 'summary.csv').exists()
+    import csv
+    with (out/'summary.csv').open() as f:
+        methods = {r['method'] for r in csv.DictReader(f)}
+    assert 'paper_gnn' in methods
     assert any((out / 'figures').glob('*above_training_gain*_state_x2.png'))
 
 
@@ -34,8 +46,12 @@ def test_topology_experiment_smoke(tmp_path):
     from experiments.topology_generalization import parse_args, run
     out = tmp_path / 'topology'
     result = run(parse_args(['--quick', '--out', str(out)]))
-    assert result['trained_models'] == 1
+    assert result['trained_models'] == 2
     assert (out / 'summary.csv').exists()
+    import csv
+    with (out/'summary.csv').open() as f:
+        methods = {r['method'] for r in csv.DictReader(f)}
+    assert 'paper_gnn' in methods
     assert (out / 'figures' / 'ring').exists()
     assert any((out / 'figures' / 'ring').glob('*_graph.png'))
 
