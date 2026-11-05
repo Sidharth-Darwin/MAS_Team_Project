@@ -1,0 +1,21 @@
+{
+  "agents": 10,
+  "batch": 64,
+  "device": "cpu",
+  "epochs": 100,
+  "eta_small_gain": 0.95,
+  "lambda": 0.0,
+  "lr": 0.002,
+  "objective": "sum_k ||L_rw X(k)||_F^2 + lambda * ||U_total(k)||_F^2",
+  "paper_best_validation_objective": 196.90058164193806,
+  "paper_hidden": 2,
+  "paper_projection": false,
+  "seed": 16,
+  "small_gain_best_validation_objective": 202.2190344876673,
+  "small_gain_projection": "||W||_2 <= eta / gamma_train",
+  "source_checkpoint": "simulation/assets/topology_rep00_identity.npz",
+  "topology": "complete",
+  "train_horizon": 60,
+  "training_streams_matched": true,
+  "val_batch": 64
+}

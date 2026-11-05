@@ -12,6 +12,7 @@ This package contains the reusable control and evaluation code. The command-line
 | [`control/`](control/README.md) | Physical systems, controller, simulation and plant gain | `A_i`, `B_i`, `K_i`, `W`, physical updates, `gamma_plant` |
 | [`learning/`](learning/README.md) | Projected-Adam training | `J_E + lambda J_U`, constrained `W` |
 | [`evaluation/`](evaluation/README.md) | Paired evaluation, checkpoints and outputs | Finite-horizon costs, improvement percentages |
+| [`robust/`](robust/) | Optional scalar W-MSR filtering, adversary-count validation, and small-graph robustness checks | W-MSR trimming parameter `F`, `(r,s)`-robustness |
 
 ## Graph and controller interface
 
@@ -21,7 +22,7 @@ $$
 P_{rw}=D^{-1}A_{graph},\qquad L_{rw}=I_N-P_{rw},\qquad E=L_{rw}X.
 $$
 
-`Graph.error(X)` returns `E` in shape `(N, 2)` using sparse neighborhood multiplication. This is the **only** graph operation used before the learned correction `V = phi(EW)`; there is no additional graph filter.
+`Graph.error(X)` returns `E` in shape `(N, 2)` using sparse neighborhood multiplication. This is the graph operation used by the original learned controller `V = phi(EW)`. The optional `robust/` package adds a separate W-MSR message-filtering utility; it does not change the original controller or its small-gain proof.
 
 ```python
 import numpy as np
@@ -40,3 +41,7 @@ error = graph.error(states)
 ## Scope
 
 All present physical-system and training APIs assume **two states and one input per agent**, with a shared `(2, 1)` controller weight. All graph sizes can vary, provided the graph and physical system have the same number of agents. See the control README for the physical model and limitations of the numerical small-gain calculation.
+
+## Optional resilient-message utilities
+
+`robust/wmsr.py` implements the canonical scalar W-MSR trim-and-convex-update operation and an explicitly labeled coordinate-wise adapter for vector states. The latter is used by the optional visual simulation only. It is not a general vector W-MSR theorem and does not inherit the original fixed-Laplacian small-gain certificate. See [`simulation/README.md`](../../simulation/README.md) for the implemented adversary model, graph-robustness assumptions, and limitations.

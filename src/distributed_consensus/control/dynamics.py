@@ -5,6 +5,36 @@ import torch
 from distributed_consensus.control.controllers import correction_numpy, activate
 
 
+def advance_numpy(states, system, total_input, disturbance=None):
+    """Apply the existing physical plant update using a supplied actuator input.
+
+    Args:
+        states: Current physical states, shape ``(N,2)``.
+        system: Existing ``System`` returned by ``build_system``/``generate_system``.
+        total_input: Commanded physical inputs, shape ``(N,1)``. This may be
+            produced by any controller that obeys the same plant interface.
+        disturbance: Optional additive actuator-channel input, shape ``(N,1)``.
+
+    Returns:
+        Next physical states, shape ``(N,2)``.
+
+    This function deliberately contains the single authoritative plant update
+    so external simulators can compare multiple distributed policies without
+    reimplementing the agent dynamics.
+    """
+    x = np.asarray(states, np.float64)
+    u = np.asarray(total_input, np.float64)
+    if x.shape != (system.n, 2) or not np.isfinite(x).all():
+        raise ValueError('states must be finite with shape (N,2)')
+    if u.shape != (system.n, 1) or not np.isfinite(u).all():
+        raise ValueError('total_input must be finite with shape (N,1)')
+    d = np.zeros_like(u) if disturbance is None else np.asarray(disturbance, np.float64)
+    if d.shape != u.shape or not np.isfinite(d).all():
+        raise ValueError('disturbance must be finite shape (N,1)')
+    return (np.einsum('nij,nj->ni', system.A, x)
+            + np.einsum('nij,nj->ni', system.B, u + d))
+
+
 def step_numpy(states, system, graph, W=None, activation='identity', disturbance=None):
     """One PHYSICAL step. states:(N,2); W:(2,1) or None for baseline.
 
@@ -21,9 +51,7 @@ def step_numpy(states, system, graph, W=None, activation='identity', disturbance
     # External actuator-channel perturbation only at inference. Report commanded
     # physical energy using 'total', never add disturbance to the training objective.
     d = np.zeros_like(total) if disturbance is None else np.asarray(disturbance,np.float64)
-    if d.shape != total.shape or not np.isfinite(d).all():
-        raise ValueError('disturbance must be finite shape (N,1)')
-    next_states = np.einsum('nij,nj->ni',system.A,x) + np.einsum('nij,nj->ni',system.B,total+d)
+    next_states = advance_numpy(x, system, total, d)
     return dict(states=x.copy(), disagreement=e, local=local, correction=corr,
                 total=total, next_states=next_states)
 

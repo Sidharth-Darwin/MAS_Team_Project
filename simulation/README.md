@@ -1,185 +1,114 @@
-# Multi-Agent Control Lab — interactive alignment demonstration
+# Scalar W-MSR consensus-control test bench
 
-An **add-on**, not a rewrite of `MAS_Team_Project`. All code here is inside
-`simulation/`. It **imports** your existing library and requires no changes
-to `src/`, `experiments/`, tests, or trained models.
+## What this is
 
-## Setup and launch (recommended)
+This is an **abstract consensus-control test bench**, not a practical robot or vehicle simulation. Its main view is a consensus-error chart plus a communication graph and a per-agent message audit.
 
-Extract the downloaded `simulation_only.zip` into the **root** of your existing
-`~/Downloads/distributed_consensus/` repository, so that it contains
-`simulation/`, `src/`, and `pyproject.toml` as siblings.
+It compares five policies from identical initial physical states:
+
+1. **Local-only reference** — ignores neighbour messages.
+2. **Paper GNN (raw)** — trained paper-style controller using unfiltered messages.
+3. **Paper GNN + W-MSR** — the same trained controller using the scalar W-MSR filter.
+4. **Small-gain (raw)** — your trained controller using unfiltered messages.
+5. **Small-gain + W-MSR** — the same trained controller using the scalar W-MSR filter.
+
+The primary comparisons are raw versus W-MSR for each learned controller. Local-only is only a reference because it does not use communication.
+
+## The exact W-MSR rule
+
+`src/distributed_consensus/robust/wmsr.py` implements the scalar algorithm supplied for this project. Every normal receiver:
+
+1. Compares the scalar value from each neighbour with its own value.
+2. Removes up to `F` smallest neighbour values that are strictly below its own.
+3. Removes up to `F` largest neighbour values that are strictly above its own.
+4. Keeps equal values and all other neighbour values.
+5. Averages its own value together with the retained neighbour values.
+
+The implementation uses simultaneous updates from the same pre-update signal vector. `wmsr_local(X, N, F)` returns the updated scalar vector; `wmsr_local_with_details(...)` additionally returns retained/ignored sender IDs for the GUI and tests.
+
+**For `F=1`, the supplied algorithm can ignore two different neighbours in one update:** the smallest value below the receiver's own value and the largest value above it. This is intentional and follows the supplied pseudocode. It does not mean two malicious neighbours are allowed. An honest neighbour with an extreme value can also be ignored.
+
+## How it is used by the controllers
+
+Each agent sends one scalar controller signal:
+
+- Paper GNN: `H @ x_i` (the bundled paper model has one hidden channel).
+- Small-gain controller: `W.T @ x_i`.
+
+W-MSR filters these scalar neighbour messages. The retained values are then used to form the corresponding controller's original neighbour-feedback correction. The two-state physical plant is still propagated by `src/distributed_consensus/control/dynamics.py`; the scalar W-MSR average does not replace the physical state update.
+
+This is a scalar message-filtering adaptation inside the feedback loop. The classical scalar W-MSR theorem does **not** automatically prove stability of the complete two-state physical feedback system, and the original fixed-Laplacian small-gain theorem does not automatically cover this state-dependent filtering operation.
+
+
+## Reading the metrics
+
+The controller table contains three different quantities:
+
+- **e_RMS** is the *current* mean-centred RMS disagreement of the normal agents. This is the quantity plotted over time.
+- **J_E** is the *cumulative* squared disagreement cost up to the current step.
+- **J_U** is the *cumulative* squared physical control-input energy up to the current step.
+
+For normal-agent states \(x_i(k)\), their mean \(\bar{x}(k)\), and scalar inputs \(u_i(k)\):
+
+\[
+e_{\mathrm{RMS}}(k)=\sqrt{\frac{1}{N}\sum_{i=1}^{N}\|x_i(k)-\bar{x}(k)\|_2^2},
+\]
+\[
+J_E(k)=\sum_{t=0}^{k-1}\sum_{i=1}^{N}\|x_i(t)-\bar{x}(t)\|_2^2,\qquad
+J_U(k)=\sum_{t=0}^{k-1}\sum_{i=1}^{N}u_i(t)^2.
+\]
+
+So **the current error is not formed by adding J_E and J_U**. \(J_E\) and \(J_U\) are accumulated diagnostic costs. They can only stay the same or increase; they appear to flatten when the new per-step contributions become very small. Meanwhile, the current \(e_{\mathrm{RMS}}\) can keep decreasing. The GUI shows these two costs separately and does not combine them into a weighted total.
+
+The controller table shows the current \(e_{\mathrm{RMS}}\) and the accumulated \(J_E,J_U\) values at the current step; only \(e_{\mathrm{RMS}}\) is drawn as a time-series chart.
+
+## Adversary and `F`
+
+The demo uses one simple attack: **malicious broadcast**. A compromised agent sends the same false scalar value to all its neighbours. The false value is automatically chosen just outside the current normal-signal range; there is no manual attack-strength control.
+
+**Byzantine equivocation** is different: a compromised sender sends different false values to different neighbours. Equivocation is not included in this simplified demo. Physical actuator attacks and communication jamming are also not included.
+
+The threat model is **F-local**: every normal agent has at most `F` malicious neighbours. This does not limit the total number of malicious agents if they are sufficiently separated.
+
+For the standard scalar F-local malicious W-MSR result, `(2F+1)`-robustness is a sufficient fixed-graph condition. For `F=1`, the GUI checks 3-robustness. Connectivity by itself is insufficient. A failed condition does not stop an illustrative run, but no W-MSR guarantee should be claimed for that graph.
+
+## GUI controls and numbers
+
+- **Graph:** choose the communication topology.
+- **Malicious agent IDs:** 1-based IDs; use `0` to disable the attacker.
+- **F:** maximum malicious neighbours allowed at any normal agent under the F-local assumption.
+- **e_RMS:** current mean-centred RMS disagreement among normal agents.
+- **J_E:** cumulative squared disagreement cost.
+- **J_U:** cumulative squared physical control-input energy.
+- **Orange dashed arrow:** the selected receiver ignored that sender's scalar value. The communication link remains present.
+
+Use **Ctrl + +** (or **Ctrl + =**) to zoom in, **Ctrl + -** to zoom out, and **Ctrl + 0** to reset the interface size.
+
+Select a controller row to highlight it. Select a node to open a message audit showing received values, retained neighbours, ignored neighbours, and the W-MSR mean.
+
+**SAVE FULL RUN** saves the complete run for all five controllers: trajectories, summary, configuration and PNG figures. There is no separate network-snapshot selector.
+
+## Run
 
 ```bash
-cd ~/Downloads/distributed_consensus
 uv run python -m simulation
 ```
 
-Alternative if not using uv: activate the environment with the original
-project installed (`pip install -e .`), then run `python -m simulation`.
-
-**GUI dependency:** Python's built-in `tkinter`. On Ubuntu/Debian, if it is not
-installed, run `sudo apt install python3-tk` using your system Python. NumPy,
-SciPy, PyTorch, and Matplotlib are already dependencies of the original project.
-There is **no** Pygame/PyQt/browser/graphics engine dependency.
-
-To run the headless comparison without tkinter:
+Headless preview:
 
 ```bash
-uv run python -m simulation.preview --steps 200
-uv run python -m simulation.preview --steps 200 --pulse-at 85 --pulse-agent 3
-uv run python -m unittest discover -s simulation/tests -v
+uv run python -m simulation.preview \
+  --topology complete --adversary 10 --F 1 --steps 250 \
+  --out results/wmsr_local_preview
 ```
 
-To export a headless CSV, add `--csv simulation/logs/preview.csv`.
-
-## Alternative independent directory
-
-The `simulation/` directory may live in a different codebase as long as Python
-can import `distributed_consensus` from the original project's `src` package.
-For example, from the parent folder containing the standalone `simulation/`:
+Multi-trial evaluation:
 
 ```bash
-PYTHONPATH="$HOME/Downloads/distributed_consensus/src:$PWD" python -m simulation
+uv run python -m simulation.evaluate \
+  --trials 20 --steps 250 --topology complete \
+  --adversary 10 --F 1 \
+  --out results/wmsr_local_evaluation
 ```
 
-Use a Python environment with dependencies from the original project.
-
-## What you see
-
-- **Left:** local-only controller, `u_i = K_i x_i`.
-- **Right:** fixed, pretrained learned controller,
-  `u_i = K_i x_i + phi(W^T e_i)`.
-- Identical physical matrices, graph, time steps, initial states, and injected
-  disturbances on both sides.
-- Every rendered lifting column is an **independent one-degree-of-freedom
-  linear actuator**. Its height is drawn from actual `q_i` (state 0); its
-  velocity is state 1. The dashed linking line is a **virtual alignment guide**,
-  **not** a mechanically rigid platform. No force coupling, collision avoidance,
-  saturations, or stress model has been invented.
-- Bottom left: actual undirected communication graph; selected agent and its
-  neighbors; signed state, learned correction, and commanded total input.
-- Bottom right: live RMS disagreement curves on a logarithmic scale.
-
-The default controller is the unchanged, numeric-only Experiment 04 checkpoint
-`rep00_identity.npz` copied byte-for-byte into `simulation/assets/`. It is loaded
-by `distributed_consensus.evaluation.reporting.load_checkpoint()`.
-Original project code calculates and validates the agent physical matrices and K.
-No weights are trained in this demo.
-
-## Controls
-
-| Action | What it does |
-|---|---|
-| Play / Pause | Advance both simulations synchronously |
-| STEP / right arrow | Advance exactly one discrete-time step |
-| RESTART / Ctrl+R | Reset both to identical saved starting conditions |
-| Click a column | Select the same agent index in both worlds |
-| Drag a column vertically | Apply **the same additive position displacement** to both worlds at the same simulation step |
-| PULSE BOTH | Apply the same additive actuator-input disturbance for three steps to the selected agent on both sides |
-| Agents | 3, 5, 10, 20 (requires APPLY / RESET) |
-| Graph | Original checkpoint graph, chain, star, ring, wide ring, complete, or random |
-| Seed | Set deterministic initial states; APPLY / RESET |
-| Steps/sec | Playback rate, **not** the physical system timestep |
-| SAVE CSV | Export actual signed states, controls and disturbances to `simulation/logs/` |
-| Esc / Space | Pause / toggle playback |
-
-**Network-size changes:** at N=10, the original physical matrices are used.
-For other N, the original library's `generate_system()` builds an appropriate
-heterogeneous, exact-matchable system. The **same frozen W** is reused without
-retraining. Generalization quality and small-gain margins can change; these
-settings are exploratory, not guaranteed to improve performance.
-
-**Graph changes:** physical matrices and W remain fixed for a given N.
-`checkpoint` with a different N uses chain as a fallback, not the saved graph.
-
-## Predefined success criterion
-
-A system is *operationally ready* when all three are true:
-
-```
-max_i |q_i| <= 0.05
-max_i |v_i| <= 0.05
-max_i q_i - min_i q_i <= 0.07
-```
-
-and this is observed continuously for **8 samples**. The UI retroactively
-reports the **first** sample of that confirmed 8-sample sequence. Readiness
-is invalidated if the condition is later violated; intervention resets the
-readiness clock. This is a finite-horizon operational metric, **not** a formal
-infinite-horizon settling-time proof.
-
-The disagreement threshold is `e_RMS <= 1e-3`, likewise displayed after 8
-consecutive samples. The project's research *settling time* is stricter: it
-requires staying within the bound through the entire observation horizon.
-The GUI does **not** relabel the 8-step operational indicator as that stronger
-research metric.
-
-Cumulative `J_E` is sum of `||E(k)||_F^2` over acted-upon states and `J_U` is
-sum of `||U(k)||_F^2` for the **commanded physical input**; neither includes
-the extra disturbance input. The GUI displays both as a comparison, not as
-necessarily better in all scenarios.
-
-## Reproduced example (original Experiment 04 checkpoint; seed 3, chain)
-
-For 200 physics steps, initial `q ~ Uniform(-2,2)` and
-`v ~ Uniform(-0.6,0.6)` in fixed NumPy RNG order:
-
-| Metric | Baseline | Learned |
-|---|---:|---:|
-| Operational readiness first sample | 43 | 38 |
-| Retrospective research disagreement settling (`e_RMS <= 1e-3`) | 79 | 58 |
-| Cumulative disagreement cost | 318.391791 | 295.758207 |
-| Cumulative total commanded-input energy | 930.492353 | 859.118587 |
-
-Adding a **matched** amplitude `+8` three-step actuator-input pulse to agent
-3 at step 85 gives operational readiness after intervention at 115 (baseline)
-versus 113 (learned). These are observed cases, not guarantees for other seeds,
-topologies, disturbances, or network sizes.
-
-## Fidelity / local-only information
-
-Each local agent computes, using only a snapshot of its own state and the
-messages from the neighbor IDs in its routing table:
-
-```
-e_i = x_i - (sum_j a_ij x_j) / sum_j a_ij
-u_local = K_i x_i
-v_i = phi(W.T e_i)  # zero for baseline
-u_i = u_local + v_i
-x_i_next = A_i x_i + B_i (u_i + external_disturbance_i)
-```
-
-Neighbor messages are all from timestep `k`; every decision is computed
-before *any* next-state is committed. Global graph operations are used **only**
-for visual metrics and for comparison tests, not for agent control.
-
-The reference `step_numpy()` and `rollout_numpy()` functions from the original
-package provide numerical ground truth in the test suite. The per-agent method
-must match them to numerical precision. We do not edit either function.
-
-**Interventions:** a mouse drag is an explicit externally applied instantaneous
-position change; a pulse is an additive disturbance in the **actuator input
-channel**, applied identically to both worlds. A pulse is not a physically
-modeled arbitrary force on a rigid platform. CSV separates commanded input,
-disturbance, and external position jumps. Manual interventions can produce
-slow recovery or worse learned performance; the display always shows real data.
-
-## File ownership
-
-```
-simulation/
-  __init__.py
-  __main__.py           # GUI entry point
-  gui.py                # Tkinter drawing and interaction only
-  model.py              # per-agent local-information synchronous simulator
-  preview.py            # headless compare/export
-  assets/
-    topology_rep00_identity.npz  # UNCHANGED COPIED checkpoint
-  tests/
-    test_simulation.py   # agreement with original step_numpy()/rollout_numpy()
-  README.md
-```
-
-`simulation/logs/` is created only if you export CSV. No research files are
-written or modified. This is a visual presentation, not a fifth research run.
+Use `--adversary 0` to disable the attacker. Try `chain`, `ring`, `wide_ring`, `star`, and `random` to see the graph-condition warning.
