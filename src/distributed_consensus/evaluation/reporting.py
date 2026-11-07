@@ -54,40 +54,6 @@ def load_checkpoint(path):
     return system,graph,W,activation,lam
 
 
-def save_training_plot(path,history,name):
-    fig,axes=plt.subplots(1,2,figsize=(11,4.2))
-    x=[r['epoch'] for r in history]
-    for ax,label in zip(axes,('J_E','J_U')):
-        ax.plot(x,[r[f'train_{label}'] for r in history],label='train')
-        vv=[(r['epoch'],r[f'val_{label}']) for r in history if r[f'val_{label}'] is not None]
-        ax.plot([v[0] for v in vv],[v[1] for v in vv],label='held-out validation')
-        ax.set(xlabel='Epoch',ylabel=label,title=name);ax.legend();ax.grid(alpha=.2)
-    fig.tight_layout()
-    fig.savefig(str(path)+'.png',dpi=160);fig.savefig(str(path)+'.svg');plt.close(fig)
-
-
-def save_curve_plot(path,curves,label):
-    fig,ax=plt.subplots(figsize=(7,4.5))
-    ax.plot(curves['baseline'],label='local-only')
-    ax.plot(curves['learned'],label='learned correction')
-    ax.set(xlabel='Physical timestep',ylabel='Mean disagreement 2-norm',title=label)
-    ax.grid(alpha=.25);ax.legend();fig.tight_layout()
-    fig.savefig(str(path)+'.png',dpi=160);fig.savefig(str(path)+'.svg');plt.close(fig)
-
-
-def save_tradeoff_plot(path,rows):
-    # Rows contain held-out metrics for different lambdas on the SAME small network.
-    if not rows:return
-    fig,axs=plt.subplots(1,2,figsize=(11,4.2))
-    labels=[f"{r['lambda']:.4g}" for r in rows]
-    x=np.arange(len(rows))
-    for ax,key,title in zip(axs,('mean_J_E','mean_J_U'),('Disagreement','Physical control energy')):
-        ax.bar(x,[r[key] for r in rows]);ax.set_xticks(x,labels)
-        ax.set(xlabel='lambda',ylabel=key,title=title);ax.grid(axis='y',alpha=.2)
-    fig.tight_layout();fig.savefig(str(path)+'.png',dpi=160)
-    fig.savefig(str(path)+'.svg');plt.close(fig)
-
-
 def save_system(path,system,graph):
     """Persist EVERY inference system's physical matrices and sparse graph, numeric-only."""
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
@@ -95,9 +61,3 @@ def save_system(path,system,graph):
     weights=np.asarray(graph.adjacency[rows,cols]).reshape(-1)
     np.savez_compressed(path,A=system.A,B=system.B,K=system.K,
          target=system.target,n=np.array(system.n),row=rows,col=cols,edge_weights=weights)
-
-
-def save_curve_csv(path,curves):
-    write_csv(path,[{'k':k,'baseline_mean_disagreement':float(curves['baseline'][k]),
-                     'learned_mean_disagreement':float(curves['learned'][k])}
-                    for k in range(len(curves['baseline']))])

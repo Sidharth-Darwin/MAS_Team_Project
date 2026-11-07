@@ -21,7 +21,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from distributed_consensus.control.dynamics import rollout_numpy
-from distributed_consensus.control.plant_gain import full_gain, small_gain
+from distributed_consensus.control.plant_gain import full_gain
 from distributed_consensus.control.plants import build_system, generate_system
 from distributed_consensus.evaluation.metrics import trajectory_metrics
 from distributed_consensus.evaluation.reporting import save_checkpoint, write_json, write_csv

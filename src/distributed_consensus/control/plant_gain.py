@@ -31,7 +31,7 @@ def scalar_gain(target):
     d0=(1-delta)**2+tau**2
     d1=-2*tau*(1+delta)
     d2=4*delta
-    # d/dt [N(t)/D(t)] numerator, in ascending coefficients:
+    # d/dt [N(t)/D(t)] numerator, in descending powers of t [c2, c1, c0]:
     polynomial=np.array([-n1*d2,-2*n0*d2,n1*d0-n0*d1])
     coef=polynomial.copy()
     while len(coef)>1 and abs(coef[0])<1e-14: coef=coef[1:]

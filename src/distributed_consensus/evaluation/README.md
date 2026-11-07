@@ -22,6 +22,8 @@ J_{pair}=\sum_{k=0}^{T-1}\frac1N\sum_{i=1}^{N}\|x_i(k)-\bar x(k)\|_2^2,
 \qquad \bar x(k)=\frac1N\sum_{i=1}^{N}x_i(k).
 $$
 
+Note: by algebraic identity, this mean-centered variance equals $\frac{1}{2N^2}\sum_{i,j}\Vert{}x_i(k)-x_j(k)\Vert{}_2^2$, the average pairwise squared disagreement across all agents.
+
 `J_pair` is a separate **evaluation metric**, not the training loss. The code also reports terminal disagreement, maximum disagreement and relative-threshold crossing/settling times. *Settling time* is the first time after which all remaining observed samples stay below the threshold, not merely the first crossing.
 
 `evaluate_pair()` rolls out the local-only baseline (`W=None`) and the learned controller on **identical** initial states, graph, physical system and optional disturbances, then aggregates the results over samples. For any positive baseline cost `J`, the reported percentage improvement is
