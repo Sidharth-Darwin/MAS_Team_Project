@@ -3,7 +3,6 @@ cuda-bindings==13.4.4
 cuda-pathfinder==1.8.5
 cuda-toolkit==13.2.2
 cycler==0.12.1
--e file:///home/sid/Downloads/distributed_consensus
 filelock==4.2.5
 fonttools==4.68.0
 fsspec==2026.9.0

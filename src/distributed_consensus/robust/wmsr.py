@@ -9,6 +9,7 @@ The physical simulation now sends one scalar coordination signal per agent,
 so W-MSR is applied once per receiver (not separately to multiple plant-state
 coordinates).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ import numpy as np
 @dataclass(frozen=True)
 class WMSRLocalResult:
     """Full result and audit trail for one simultaneous scalar W-MSR update."""
+
     values: np.ndarray
     retained_ids: tuple[tuple[int, ...], ...]
     removed_high_ids: tuple[tuple[int, ...], ...]
@@ -36,26 +38,30 @@ class WMSRLocalResult:
 def _validate_inputs(X, N: Mapping[int, Iterable[int]], F: int):
     values = np.asarray(X, dtype=np.float64)
     if values.ndim != 1 or values.size < 2 or not np.isfinite(values).all():
-        raise ValueError('X must be a finite one-dimensional vector with at least two nodes')
+        raise ValueError(
+            "X must be a finite one-dimensional vector with at least two nodes"
+        )
     if isinstance(F, (bool, np.bool_)) or int(F) != F or F < 0:
-        raise ValueError('F must be a nonnegative integer')
+        raise ValueError("F must be a nonnegative integer")
     if not isinstance(N, Mapping):
-        raise TypeError('N must be a dictionary mapping each node to its neighbour IDs')
+        raise TypeError("N must be a dictionary mapping each node to its neighbour IDs")
     n = values.size
     neighbors = []
     for node in range(n):
         if node not in N:
-            raise ValueError(f'N is missing neighbour list for node {node}')
+            raise ValueError(f"N is missing neighbour list for node {node}")
         ids = tuple(int(j) for j in N[node])
         if len(ids) != len(set(ids)):
-            raise ValueError(f'node {node} has duplicate neighbour IDs')
+            raise ValueError(f"node {node} has duplicate neighbour IDs")
         if any(j < 0 or j >= n or j == node for j in ids):
-            raise ValueError(f'node {node} has an invalid neighbour ID')
+            raise ValueError(f"node {node} has an invalid neighbour ID")
         neighbors.append(ids)
     return values, tuple(neighbors), int(F)
 
 
-def wmsr_local_with_details(X, N: Mapping[int, Iterable[int]], F: int = 1) -> WMSRLocalResult:
+def wmsr_local_with_details(
+    X, N: Mapping[int, Iterable[int]], F: int = 1
+) -> WMSRLocalResult:
     """Apply the user's local scalar W-MSR algorithm simultaneously.
 
     For every node i:
@@ -94,7 +100,9 @@ def wmsr_local_with_details(X, N: Mapping[int, Iterable[int]], F: int = 1) -> WM
 
         # Exactly: mean(concat(([X[node]], filtered_neighbors_values))).
         if retained:
-            updated[node] = float(np.mean(np.concatenate(([values[node]], values[retained]))))
+            updated[node] = float(
+                np.mean(np.concatenate(([values[node]], values[retained])))
+            )
         else:
             updated[node] = values[node]
 
@@ -122,15 +130,15 @@ def wmsr_local(X, N: Mapping[int, Iterable[int]], F: int = 1) -> np.ndarray:
 
 def _adjacency_neighbor_masks(graph) -> tuple[int, ...]:
     """Return Python-int neighbor masks from the project's Graph or adjacency."""
-    adjacency = getattr(graph, 'adjacency', graph)
-    a = adjacency.tocsr() if hasattr(adjacency, 'tocsr') else np.asarray(adjacency)
+    adjacency = getattr(graph, "adjacency", graph)
+    a = adjacency.tocsr() if hasattr(adjacency, "tocsr") else np.asarray(adjacency)
     n = int(a.shape[0])
     if len(a.shape) != 2 or a.shape[1] != n or n < 2:
-        raise ValueError('graph adjacency must be square with N>=2')
+        raise ValueError("graph adjacency must be square with N>=2")
     masks = []
     for i in range(n):
-        if hasattr(a, 'indices') and hasattr(a, 'indptr'):
-            neighbors = a.indices[a.indptr[i]:a.indptr[i + 1]]
+        if hasattr(a, "indices") and hasattr(a, "indptr"):
+            neighbors = a.indices[a.indptr[i] : a.indptr[i + 1]]
         else:
             neighbors = np.flatnonzero(np.asarray(a[i]) != 0)
         mask = 0
@@ -141,7 +149,9 @@ def _adjacency_neighbor_masks(graph) -> tuple[int, ...]:
     return tuple(masks)
 
 
-def _reachable_counts(neighbor_masks: tuple[int, ...], r: int) -> tuple[list[int], list[int]]:
+def _reachable_counts(
+    neighbor_masks: tuple[int, ...], r: int
+) -> tuple[list[int], list[int]]:
     n = len(neighbor_masks)
     full = (1 << n) - 1
     sizes = [0] * (1 << n)
@@ -169,7 +179,7 @@ def is_r_robust(graph, r: int, *, max_nodes: int = 14) -> bool | None:
     The exact check costs O(3**N), so it is deliberately limited to small N.
     """
     if isinstance(r, bool) or int(r) != r or r < 1:
-        raise ValueError('r must be a positive integer')
+        raise ValueError("r must be a positive integer")
     r = int(r)
     masks = _adjacency_neighbor_masks(graph)
     n = len(masks)
@@ -190,14 +200,14 @@ def is_r_robust(graph, r: int, *, max_nodes: int = 14) -> bool | None:
 def is_rs_robust(graph, r: int, s: int, *, max_nodes: int = 14) -> bool | None:
     """Exactly test (r,s)-robustness for small graphs; None above max_nodes."""
     if isinstance(r, bool) or int(r) != r or r < 1:
-        raise ValueError('r must be a positive integer')
+        raise ValueError("r must be a positive integer")
     if isinstance(s, bool) or int(s) != s or s < 1:
-        raise ValueError('s must be a positive integer')
+        raise ValueError("s must be a positive integer")
     r, s = int(r), int(s)
     masks = _adjacency_neighbor_masks(graph)
     n = len(masks)
     if s > n:
-        raise ValueError('s cannot exceed the number of nodes')
+        raise ValueError("s cannot exceed the number of nodes")
     if n > max_nodes:
         return None
     sizes, counts = _reachable_counts(masks, r)
@@ -217,8 +227,14 @@ def is_rs_robust(graph, r: int, s: int, *, max_nodes: int = 14) -> bool | None:
     return True
 
 
-def assess_wmsr_topology(graph, F: int, threat_model: str = 'F-local-malicious', *,
-                         adversary_ids: Iterable[int] = (), max_nodes: int = 14) -> dict:
+def assess_wmsr_topology(
+    graph,
+    F: int,
+    threat_model: str = "F-local-malicious",
+    *,
+    adversary_ids: Iterable[int] = (),
+    max_nodes: int = 14,
+) -> dict:
     """Report textbook W-MSR topology condition; this is not a MAS plant proof.
 
     The graph argument is the communication graph. For Byzantine variants,
@@ -234,85 +250,125 @@ def assess_wmsr_topology(graph, F: int, threat_model: str = 'F-local-malicious',
     the stronger robustness property.
     """
     if isinstance(F, bool) or int(F) != F or F < 0:
-        raise ValueError('F must be a nonnegative integer')
+        raise ValueError("F must be a nonnegative integer")
     F = int(F)
     supported = {
-        'F-total-malicious': ('rs', F + 1, F + 1,
-                              'necessary and sufficient: (F+1,F+1)-robust'),
-        'F-local-malicious': ('r', 2 * F + 1, None,
-                              'sufficient: (2F+1)-robust; necessary: (F+1)-robust'),
-        'F-total-byzantine': ('normal-r', F + 1, None,
-                              'normal-node induced graph must be (F+1)-robust'),
-        'F-local-byzantine': ('normal-r', F + 1, None,
-                              'normal-node induced graph must be (F+1)-robust'),
+        "F-total-malicious": (
+            "rs",
+            F + 1,
+            F + 1,
+            "necessary and sufficient: (F+1,F+1)-robust",
+        ),
+        "F-local-malicious": (
+            "r",
+            2 * F + 1,
+            None,
+            "sufficient: (2F+1)-robust; necessary: (F+1)-robust",
+        ),
+        "F-total-byzantine": (
+            "normal-r",
+            F + 1,
+            None,
+            "normal-node induced graph must be (F+1)-robust",
+        ),
+        "F-local-byzantine": (
+            "normal-r",
+            F + 1,
+            None,
+            "normal-node induced graph must be (F+1)-robust",
+        ),
     }
     if threat_model not in supported:
-        raise ValueError(f'threat_model must be one of {tuple(supported)}')
+        raise ValueError(f"threat_model must be one of {tuple(supported)}")
     kind, r, s, condition = supported[threat_model]
-    full_n = int(graph.n if hasattr(graph, 'n') else len(_adjacency_neighbor_masks(graph)))
+    full_n = int(
+        graph.n if hasattr(graph, "n") else len(_adjacency_neighbor_masks(graph))
+    )
     checked_graph = graph
     checked_ids = tuple(sorted(set(int(i) for i in adversary_ids)))
-    if kind == 'normal-r':
+    if kind == "normal-r":
         if any(i < 0 or i >= full_n for i in checked_ids):
-            raise ValueError('adversary IDs must be valid graph nodes')
+            raise ValueError("adversary IDs must be valid graph nodes")
         normal_ids = [i for i in range(full_n) if i not in set(checked_ids)]
         if len(normal_ids) < 2:
             return {
-                'F': F, 'threat_model': threat_model, 'N': full_n,
-                'normal_N': len(normal_ids), 'required_robustness': f'{r}-robust',
-                'condition': condition, 'condition_met': False, 'exact_check': True,
-                'max_nodes_for_exact_check': int(max_nodes),
-                'interpretation': 'Fewer than two normal agents; no normal-network W-MSR consensus claim.',
+                "F": F,
+                "threat_model": threat_model,
+                "N": full_n,
+                "normal_N": len(normal_ids),
+                "required_robustness": f"{r}-robust",
+                "condition": condition,
+                "condition_met": False,
+                "exact_check": True,
+                "max_nodes_for_exact_check": int(max_nodes),
+                "interpretation": "Fewer than two normal agents; no normal-network W-MSR consensus claim.",
             }
-        adjacency = getattr(graph, 'adjacency', graph)
+        adjacency = getattr(graph, "adjacency", graph)
         checked_graph = adjacency.tocsr()[normal_ids][:, normal_ids]
-    degrees = np.asarray(checked_graph.sum(axis=1)).ravel() if not hasattr(checked_graph, 'degrees') else np.asarray(checked_graph.degrees)
-    checked_n = int(checked_graph.n if hasattr(checked_graph, 'n') else checked_graph.shape[0])
-    exact = (is_rs_robust(checked_graph, r, s, max_nodes=max_nodes)
-             if kind == 'rs' else is_r_robust(checked_graph, r, max_nodes=max_nodes))
+    degrees = (
+        np.asarray(checked_graph.sum(axis=1)).ravel()
+        if not hasattr(checked_graph, "degrees")
+        else np.asarray(checked_graph.degrees)
+    )
+    checked_n = int(
+        checked_graph.n if hasattr(checked_graph, "n") else checked_graph.shape[0]
+    )
+    exact = (
+        is_rs_robust(checked_graph, r, s, max_nodes=max_nodes)
+        if kind == "rs"
+        else is_r_robust(checked_graph, r, max_nodes=max_nodes)
+    )
     return {
-        'F': F,
-        'threat_model': threat_model,
-        'N': full_n,
-        'normal_N': full_n - len(checked_ids),
-        'checked_network': 'normal-node induced graph' if kind == 'normal-r' else 'full communication graph',
-        'minimum_degree': int(degrees.min()),
-        'required_robustness': f'({r},{s})-robust' if kind == 'rs' else f'{r}-robust',
-        'condition': condition,
-        'condition_met': exact,
-        'exact_check': exact is not None,
-        'max_nodes_for_exact_check': int(max_nodes),
-        'interpretation': (
-            'Textbook scalar W-MSR topology condition met.' if exact is True else
-            'Topology condition not met; no W-MSR theorem claim for this graph.' if exact is False else
-            'Exact graph-robustness check skipped for this N; guarantee not certified by this helper.'
+        "F": F,
+        "threat_model": threat_model,
+        "N": full_n,
+        "normal_N": full_n - len(checked_ids),
+        "checked_network": "normal-node induced graph"
+        if kind == "normal-r"
+        else "full communication graph",
+        "minimum_degree": int(degrees.min()),
+        "required_robustness": f"({r},{s})-robust" if kind == "rs" else f"{r}-robust",
+        "condition": condition,
+        "condition_met": exact,
+        "exact_check": exact is not None,
+        "max_nodes_for_exact_check": int(max_nodes),
+        "interpretation": (
+            "Textbook scalar W-MSR topology condition met."
+            if exact is True
+            else "Topology condition not met; no W-MSR theorem claim for this graph."
+            if exact is False
+            else "Exact graph-robustness check skipped for this N; guarantee not certified by this helper."
         ),
     }
 
 
-def validate_adversary_set(graph, adversary_ids: Iterable[int], F: int, threat_model: str = 'F-local-malicious') -> tuple[int, ...]:
+def validate_adversary_set(
+    graph, adversary_ids: Iterable[int], F: int, threat_model: str = "F-local-malicious"
+) -> tuple[int, ...]:
     """Validate the declared F-total or F-local adversary-count assumption."""
     if isinstance(F, bool) or int(F) != F or F < 0:
-        raise ValueError('F must be a nonnegative integer')
+        raise ValueError("F must be a nonnegative integer")
     F = int(F)
     ids = tuple(sorted(set(int(i) for i in adversary_ids)))
     n = int(graph.n)
     if any(i < 0 or i >= n for i in ids):
-        raise ValueError('adversary IDs must be valid zero-based graph nodes')
+        raise ValueError("adversary IDs must be valid zero-based graph nodes")
     if len(ids) >= n:
-        raise ValueError('at least one normal agent is required')
-    if threat_model.startswith('F-total') and len(ids) > F:
-        raise ValueError(f'{threat_model} permits at most F={F} adversaries total; got {len(ids)}')
-    if threat_model.startswith('F-local'):
+        raise ValueError("at least one normal agent is required")
+    if threat_model.startswith("F-total") and len(ids) > F:
+        raise ValueError(
+            f"{threat_model} permits at most F={F} adversaries total; got {len(ids)}"
+        )
+    if threat_model.startswith("F-local"):
         adj = graph.adjacency.tocsr()
         adv = set(ids)
         for i in range(n):
             if i in adv:
                 continue
-            neighbors = adj.indices[adj.indptr[i]:adj.indptr[i + 1]]
+            neighbors = adj.indices[adj.indptr[i] : adj.indptr[i + 1]]
             count = sum(int(j) in adv for j in neighbors)
             if count > F:
                 raise ValueError(
-                    f'F-local violation: normal agent {i} has {count} adversarial neighbors, F={F}'
+                    f"F-local violation: normal agent {i} has {count} adversarial neighbors, F={F}"
                 )
     return ids

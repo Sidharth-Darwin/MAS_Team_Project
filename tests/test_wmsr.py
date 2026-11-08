@@ -1,4 +1,5 @@
 """Tests for the exact scalar local W-MSR algorithm supplied by the user."""
+
 from copy import deepcopy
 
 import numpy as np
@@ -97,51 +98,55 @@ def test_updates_are_simultaneous_and_do_not_mutate_input():
 
 
 def test_invalid_inputs_are_rejected():
-    with pytest.raises(ValueError, match='finite one-dimensional'):
+    with pytest.raises(ValueError, match="finite one-dimensional"):
         wmsr_local(np.array([[0.0, 1.0]]), {0: [1], 1: [0]}, F=1)
-    with pytest.raises(ValueError, match='nonnegative integer'):
+    with pytest.raises(ValueError, match="nonnegative integer"):
         wmsr_local(np.array([0.0, 1.0]), {0: [1], 1: [0]}, F=-1)
-    with pytest.raises(ValueError, match='missing neighbour list'):
+    with pytest.raises(ValueError, match="missing neighbour list"):
         wmsr_local(np.array([0.0, 1.0]), {0: [1]}, F=1)
-    with pytest.raises(ValueError, match='duplicate neighbour'):
+    with pytest.raises(ValueError, match="duplicate neighbour"):
         wmsr_local(np.array([0.0, 1.0]), {0: [1, 1], 1: [0]}, F=1)
 
 
 def test_complete_graph_meets_f_local_malicious_sufficient_condition():
-    graph = make_graph(10, 'complete')
+    graph = make_graph(10, "complete")
     assert is_r_robust(graph, 3) is True
-    report = assess_wmsr_topology(graph, F=1, threat_model='F-local-malicious')
-    assert report['required_robustness'] == '3-robust'
-    assert report['condition_met'] is True
+    report = assess_wmsr_topology(graph, F=1, threat_model="F-local-malicious")
+    assert report["required_robustness"] == "3-robust"
+    assert report["condition_met"] is True
 
 
 def test_chain_is_connected_but_does_not_meet_f_local_wmsr_robustness():
-    graph = make_graph(10, 'chain')
-    report = assess_wmsr_topology(graph, F=1, threat_model='F-local-malicious')
-    assert report['condition_met'] is False
-    assert 'not met' in report['interpretation'].lower()
+    graph = make_graph(10, "chain")
+    report = assess_wmsr_topology(graph, F=1, threat_model="F-local-malicious")
+    assert report["condition_met"] is False
+    assert "not met" in report["interpretation"].lower()
 
 
 def test_f_local_adversary_distribution_is_validated():
-    graph = make_graph(10, 'complete')
-    assert validate_adversary_set(graph, (0,), F=1, threat_model='F-local-malicious') == (0,)
+    graph = make_graph(10, "complete")
+    assert validate_adversary_set(
+        graph, (0,), F=1, threat_model="F-local-malicious"
+    ) == (0,)
     # In a complete graph, two malicious nodes are neighbours of every normal
     # node, violating the F=1 local distribution.
-    with pytest.raises(ValueError, match='F-local violation'):
-        validate_adversary_set(graph, (0, 1), F=1, threat_model='F-local-malicious')
+    with pytest.raises(ValueError, match="F-local violation"):
+        validate_adversary_set(graph, (0, 1), F=1, threat_model="F-local-malicious")
 
 
 def test_f_local_model_can_have_more_than_f_total_malicious_nodes():
     # On a graph where compromised nodes are sufficiently separated, multiple
     # malicious nodes may exist globally while every normal node sees <= F.
-    graph = make_graph(10, 'ring')
+    graph = make_graph(10, "ring")
     ids = (0, 4)
-    assert validate_adversary_set(graph, ids, F=1, threat_model='F-local-malicious') == ids
+    assert (
+        validate_adversary_set(graph, ids, F=1, threat_model="F-local-malicious") == ids
+    )
 
 
 def test_exact_robustness_checker_does_not_claim_large_graph_result():
-    graph = make_graph(20, 'complete')
+    graph = make_graph(20, "complete")
     assert is_r_robust(graph, 3) is None
-    report = assess_wmsr_topology(graph, 1, 'F-local-malicious')
-    assert report['condition_met'] is None
-    assert report['exact_check'] is False
+    report = assess_wmsr_topology(graph, 1, "F-local-malicious")
+    assert report["condition_met"] is None
+    assert report["exact_check"] is False
