@@ -1,4 +1,4 @@
-# Distributed Neural Consensus Control
+# Attempt on Providing Convergence Gurantees for Leanred Consensus Controller
 
 Research code for direct, one-hop graph-Laplacian feedback on heterogeneous discrete-time linear multi-agent systems. A shared `(2, 1)` parameter matrix `W` is learned with projected Adam under a **numerically evaluated** discrete-time small-gain constraint.
 
